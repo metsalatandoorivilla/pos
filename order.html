@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>New Order</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+  <style>
+    :root{
+      --main-bg: linear-gradient(to bottom right, #0d47a1, #000000);
+      --card-bg: #181c24;
+      --primary: #42a5f5;
+      --primary-hover:#1976d2;
+      --accent: #bbdefb;
+      --accent2: #263859;
+      --border: #212a40;
+      --note: #ffc107;
+
+      --order-side-bg: #131624;
+      --order-item-bg: #1b2230;
+      --order-item-border: #2a374f;
+
+      --chip-bg: var(--accent2);
+      --chip-color: var(--accent);
+      --chip-selected: var(--primary);
+      --del-red: #e53935;
+
+      --search-bg: #0f1520;
+      --search-cell: #0b1220;
+      --search-text: #eaf4ff;
+    }
+
+    * { box-sizing: border-box; }
+    html,body {
+      height:100%;
+      margin:0;
+      background:var(--main-bg);
+      background-attachment: fixed;
+      background-size: cover;
+      font-family: "Poppins", sans-serif;
+      color:#fff;
+
+      /* Force horizontal scroll on small screens so layout never wraps.
+         This preserves the desktop layout on tablet and mobile as requested. */
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Keep desktop layout width fixed so mobile/tablet view appears identical (no wrapping).
+       Users will be able to pan horizontally on smaller devices. */
+    .container {
+      min-width:1200px;
+      max-width:1200px;
+      width:1200px;
+      margin:0 auto;
+      padding:12px;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    /* Header */
+    .header { display:flex; align-items:center; gap:10px; }
+    .order-type-btn { background:var(--primary); color:#fff; border:0; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.95rem; }
+    .table-title { flex:1; font-weight:700; color:var(--accent); font-size:1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .order-id { background:#212a40; padding:6px 12px; border-radius:8px; color:#e3f2fd; font-weight:700; font-size:0.9rem; }
+
+    .main-section { display:flex; gap:14px; align-items:flex-start; margin-top:6px; }
+
+    /* Menu Side */
+    .menu-side { flex:2; background:var(--card-bg); border-radius:12px; padding:12px; box-shadow:0 2px 14px rgba(66,165,245,0.08); display:flex; flex-direction:column; min-width:0; }
+    .menu-search-cell {
+      background:var(--search-cell);
+      border:1px solid var(--order-item-border);
+      border-radius:10px;
+      padding:8px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin-bottom:10px;
+    }
+    .menu-search-cell input {
+      flex:1;
+      background:transparent;
+      border:0;
+      outline:none;
+      color:var(--search-text);
+      font-weight:700;
+      padding:6px 8px;
+    }
+    .menu-search-cell .clear-search {
+      background:transparent;
+      color:var(--accent);
+      border:0;
+      cursor:pointer;
+      font-weight:700;
+      padding:6px 8px;
+      border-radius:8px;
+    }
+    .menu-tabs-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px; padding-bottom:6px; }
+    .menu-tabs {
+      display:grid;
+      grid-auto-flow:column;
+      grid-auto-columns:max-content;
+      grid-template-rows:repeat(2, auto);
+      gap:10px;
+      padding:8px;
+      white-space:nowrap;
+    }
+    .menu-tab { background:var(--accent2); color:var(--accent); border:0; padding:8px 14px; border-radius:10px; font-weight:700; font-size:1.02rem; white-space:nowrap; cursor:pointer; }
+    .menu-tab.active { background:var(--primary); color:#fff; }
+
+    /* Desktop grid preserved on all screen sizes by preventing layout shrink */
+    .menu-items { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .menu-card {
+      background:var(--order-item-bg);
+      border:1.5px solid var(--order-item-border);
+      border-radius:8px;
+      padding:10px 12px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      cursor:pointer;
+      transition:all .12s;
+      min-height:60px;
+      font-size:0.95rem;
+      white-space:normal;
+    }
+    .menu-card:hover { background:var(--accent2); border-color:var(--primary); box-shadow:0 6px 18px rgba(66,165,245,0.06); }
+    .menu-card .item-title { font-weight:700; color:var(--accent); line-height:1.14; word-break:break-word; overflow-wrap:anywhere; }
+    .menu-card .item-price { color:#81d4fa; font-weight:700; align-self:flex-end; font-size:0.95rem; }
+
+    .search-results-title { color:var(--accent); font-weight:700; margin:4px 0 8px 4px; }
+
+    /* Order Side */
+    .order-side { flex:1.1; background:var(--order-side-bg); border-radius:12px; padding:10px; display:flex; flex-direction:column; box-shadow:0 2px 12px rgba(66,165,245,0.07); min-width:0; font-size:0.95rem; }
+    .order-title-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+    .order-title { font-weight:700; color:var(--accent); font-size:1rem; }
+    .side-btns { display:flex; gap:8px; align-items:center; }
+
+    .small-btn { background:var(--primary); color:#fff; border:0; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.9rem; }
+    .small-ghost { background:var(--accent2); color:var(--accent); border:0; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.9rem; }
+
+    .order-note-badge { display:none; } /* intentionally hidden visual badge per user's request */
+
+    .schedule-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .schedule-field { padding:6px 8px; border-radius:8px; border:1.2px solid var(--primary); background:var(--order-item-bg); color:#fff; font-size:0.9rem; cursor:pointer; }
+    .schedule-clear { background:#e53935; color:#fff; border:0; padding:6px 8px; border-radius:6px; cursor:pointer; }
+
+    .order-list { display:flex; flex-direction:column; gap:8px; margin-bottom:8px; overflow:visible; }
+
+    .order-item { background:var(--order-item-bg); border:1.2px solid var(--order-item-border); border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+    .order-item.selected { border-color: var(--primary); box-shadow: 0 4px 14px rgba(66,165,245,0.09); }
+
+    .order-item .top { display:flex; align-items:center; gap:8px; width:100%; }
+    .order-item .name {
+      font-weight:700; color:var(--accent);
+      max-width:40ch;
+      overflow-wrap:break-word; /* allow wrapping for long names when editing existing order (we will allow wrap) */
+      word-break:break-word;
+      white-space:normal;
+      font-size:0.95rem;
+      flex:1 1 auto;
+      cursor:pointer;
+    }
+
+    .order-item .right-group { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+    .order-item .price { color:#81d4fa; font-weight:700; min-width:70px; text-align:right; font-size:0.82rem; }
+    .order-item .qty { display:flex; align-items:center; gap:6px; min-width:86px; }
+    .order-item .qty button { background:var(--primary); color:#fff; border:0; padding:4px 8px; border-radius:6px; cursor:pointer; font-weight:700; }
+    .order-item .qty .qty-val { background:var(--accent2); padding:4px 8px; border-radius:6px; color:#fff; font-weight:700; min-width:28px; text-align:center; }
+
+    .order-item .note-btn { background:var(--accent2); color:var(--accent); border:0; padding:6px 8px; border-radius:6px; cursor:pointer; font-weight:700; }
+    .order-item .del-btn { background:#e53935; color:#fff; border:0; padding:6px 8px; border-radius:6px; cursor:pointer; font-weight:700; }
+
+    .order-item .quicknote-line { color:var(--note); font-style:italic; padding-left:4px; font-size:0.9rem; overflow-wrap:anywhere; }
+
+    .order-total { font-weight:700; color:#81d4fa; text-align:right; margin-top:6px; font-size:0.95rem; }
+    .order-actions { display:flex; gap:10px; margin-top:8px; }
+    .action-btn { flex:1; background:var(--primary); color:#fff; border:0; border-radius:8px; padding:10px 0; font-weight:700; cursor:pointer; font-size:1rem; }
+
+    /* Quicknote popup */
+    .quicknote-popup { display:none; position:fixed; inset:0; background:rgba(18,18,28,0.9); z-index:700; align-items:center; justify-content:center; }
+    .quicknote-popup-content { background:var(--card-bg); border-radius:12px; padding:14px 16px; min-width:320px; max-width:640px; border:2px solid var(--primary); display:flex; flex-direction:column; align-items:center; }
+    .quicknote-grid { display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center; margin-bottom:8px; }
+    .chip { display:flex; align-items:center; gap:8px; background:var(--chip-bg); color:var(--chip-color); padding:8px 10px; border-radius:8px; font-weight:700; font-size:0.9rem; position:relative; }
+    .chip.selected { background:var(--chip-selected); color:#fff; }
+    .chip .chip-edit { background:transparent; color:var(--accent); border:0; padding:4px; cursor:pointer; font-size:0.9rem; }
+    .chip .chip-delete { display:none; margin-left:4px; background:var(--del-red); color:#fff; border:0; padding:3px 6px; border-radius:6px; cursor:pointer; font-size:0.85rem; }
+    .chip.show-delete .chip-delete { display:inline-flex; }
+
+    .quicknote-custom { width:100%; display:flex; gap:8px; margin-bottom:8px; }
+    .quicknote-custom input { flex:1; padding:8px 10px; border-radius:8px; border:1.2px solid var(--primary); background:var(--order-item-bg); color:#fff; }
+    .quicknote-actions { display:flex; gap:8px; }
+
+    .ordertypemodal { display:none; position:fixed; inset:0; background:rgba(18,18,28,0.9); z-index:800; align-items:center; justify-content:center; }
+    .ordertypemodal-content { background:var(--card-bg); border-radius:12px; padding:12px; min-width:320px; max-width:720px; border:2px solid var(--primary); display:flex; flex-direction:column; gap:10px; align-items:center; }
+    .type-grid { display:grid; grid-template-columns:repeat(4,56px); grid-auto-rows:56px; gap:8px; }
+    .table-cell { display:flex; align-items:center; justify-content:center; background:var(--order-item-bg); border:1.2px solid var(--order-item-border); border-radius:8px; padding:6px; cursor:pointer; }
+    .table-cell.selected { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+    .type-actions { display:flex; gap:10px; align-items:center; justify-content:center; width:100%; }
+    .type-actions .order-type-option.selected { background:var(--primary); color:#fff; }
+    .type-custom_row { display:flex; gap:10px; align-items:center; justify-content:center; width:100%; }
+    .type-custom-row { display:flex; gap:10px; align-items:center; justify-content:center; width:100%; }
+    .type-custom-row input { background:#0f151b; color:#fff; border:1px solid var(--border); padding:8px 10px; border-radius:8px; }
+
+    /* simple overlay while saving */
+    .saving-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1200; align-items:center; justify-content:center; color:#fff; font-weight:700; }
+    .saving-box { background:var(--card-bg); padding:14px 18px; border-radius:10px; border:2px solid var(--primary); display:flex; gap:10px; align-items:center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <button id="orderTypeBtn" class="order-type-btn">Select Order Type</button>
+      <div id="tableTitle" class="table-title">Select Order Type</div>
+      <div id="orderIdTag" class="order-id"></div>
+    </div>
+
+    <div class="main-section">
+      <div class="menu-side">
+        <!-- Search cell (dark) on top -->
+        <div class="menu-search-cell" title="Search items by name">
+          <i class="fas fa-search" style="color:var(--accent);margin-left:4px;"></i>
+          <input id="menuSearchInput" placeholder="Search items..." aria-label="Search items" />
+          <button id="clearSearchBtn" class="clear-search" title="Clear search"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="menu-tabs-wrapper">
+          <div id="menuTabs" class="menu-tabs"></div>
+        </div>
+
+        <!-- when searching, we show a special header and results grid above regular menu items -->
+        <div id="searchResultsArea" style="display:none;">
+          <div class="search-results-title" id="searchResultsTitle"></div>
+          <div id="searchResults" class="menu-items" style="margin-bottom:10px;"></div>
+        </div>
+
+        <div id="menuItems" class="menu-items"></div>
+      </div>
+
+      <div class="order-side">
+        <div class="order-title-row">
+          <div class="order-title">Your Order</div>
+
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="side-btns">
+              <button id="scheduleBtn" class="small-btn">Schedule</button>
+              <button id="quickNoteBtn" class="small-ghost">Quick Note</button>
+            </div>
+            <div id="orderNoteBadge" class="order-note-badge" style="display:none;"></div>
+          </div>
+        </div>
+
+        <!-- order-level quicknote line (shows when set) -->
+        <div id="orderLevelQuicknoteLine" style="margin-bottom:8px;color:var(--note);font-style:italic;display:none;"></div>
+
+        <div id="scheduleRow" class="schedule-row" style="display:none;">
+          <input id="scheduleField" class="schedule-field" type="time" />
+          <button id="clearScheduleBtn" class="schedule-clear" title="Remove schedule"><i class="fas fa-trash"></i></button>
+        </div>
+
+        <div id="orderList" class="order-list"></div>
+
+        <div id="orderTotal" class="order-total">Total: €0.00</div>
+
+        <div class="order-actions">
+          <button class="action-btn" id="payBtn">Pay</button>
+          <button class="action-btn" id="holdBtn">Hold</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quicknote popup (order-level) -->
+  <div id="quickNotePopup" class="quicknote-popup" role="dialog" aria-modal="true">
+    <div class="quicknote-popup-content">
+      <div class="quicknote-title">Select Quick Note(s)</div>
+      <div id="quickGrid" class="quicknote-grid"></div>
+
+      <div class="quicknote-custom">
+        <input id="quickCustomInput" type="text" placeholder="Type custom note..." autocomplete="off" />
+        <button id="quickAddBtn" style="background:var(--primary);color:#fff;border:0;padding:8px 10px;border-radius:8px;font-weight:700;">Add</button>
+      </div>
+
+      <div class="quicknote-actions">
+        <button id="quickConfirmBtn" style="background:var(--primary);color:#fff;border:0;padding:8px 12px;border-radius:8px;font-weight:700;">OK</button>
+        <button id="quickCancelBtn" class="ghost" style="background:var(--accent2);color:var(--accent);border:0;padding:8px 12px;border-radius:8px;font-weight:700;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Item Quicknote popup (per item) -->
+  <div id="itemQuickNotePopup" class="quicknote-popup" role="dialog" aria-modal="true">
+    <div class="quicknote-popup-content">
+      <div class="quicknote-title">Item Quick Note(s)</div>
+      <div id="itemQuickGrid" class="quicknote-grid"></div>
+
+      <div class="quicknote-custom">
+        <input id="itemQuickCustomInput" type="text" placeholder="Type custom note..." autocomplete="off" />
+        <button id="itemQuickAddBtn" style="background:var(--primary);color:#fff;border:0;padding:8px 10px;border-radius:8px;font-weight:700;">Add</button>
+      </div>
+
+      <div class="quicknote-actions">
+        <button id="itemQuickConfirmBtn" style="background:var(--primary);color:#fff;border:0;padding:8px 12px;border-radius:8px;font-weight:700;">OK</button>
+        <button id="itemQuickCancelBtn" class="ghost" style="background:var(--accent2);color:var(--accent);border:0;padding:8px 12px;border-radius:8px;font-weight:700;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OrderType modal -->
+  <div id="orderTypeModal" class="ordertypemodal" role="dialog" aria-modal="true">
+    <div class="ordertypemodal-content">
+      <div style="font-weight:700;color:var(--accent);">Select Order Type / Table</div>
+      <div id="typeGrid" class="type-grid"></div>
+
+      <!-- Wolt / Take Away / Online on one line -->
+      <div class="type-actions">
+        <button id="typeWolt" class="small-ghost order-type-option" data-type="Wolt">Wolt</button>
+        <button id="typeTA" class="small-ghost order-type-option" data-type="Take Away">Take Away</button>
+        <button id="typeOnline" class="small-ghost order-type-option" data-type="Online">Online</button>
+      </div>
+
+      <!-- Custom name on next line (dark theme) -->
+      <div class="type-custom-row">
+        <input id="customOrderInput" placeholder="Custom name..." />
+        <button id="confirmOrderType" class="small-btn">OK</button>
+        <button id="cancelOrderType" class="small-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Dialog -->
+  <div id="paymentDialog" style="display:none; position:fixed; inset:0; background:rgba(18,18,28,0.9); z-index:900; align-items:center; justify-content:center;">
+    <div style="background:var(--card-bg); border-radius:12px; padding:14px; min-width:300px; border:2px solid var(--primary); display:flex; flex-direction:column; gap:8px;">
+      <div style="font-weight:700; color:var(--accent); text-align:center;">Select Payment Type</div>
+      <button class="action-btn" style="width:100%;" data-pay="cash" id="payCashBtn">Cash</button>
+      <button class="action-btn" style="width:100%;" data-pay="card" id="payCardBtn">Card</button>
+      <button class="action-btn" style="width:100%;" data-pay="wolt" id="payWoltBtn">Wolt</button>
+      <button class="action-btn" style="width:100%;" data-pay="online" id="payOnlineBtn">Online Website</button>
+      <button class="small-ghost" style="width:100%;" id="payCancelBtn">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Saving overlay -->
+  <div id="savingOverlay" class="saving-overlay">
+    <div class="saving-box"><i class="fas fa-spinner fa-spin"></i><div id="savingText">Saving order...</div></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script>
+    // Firebase initialization
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZCm8Fmp-zNlb2D20gqLCyifky-hGtZvI",
+      authDomain: "newpos-dacb5.firebaseapp.com",
+      databaseURL: "https://newpos-dacb5-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "newpos-dacb5",
+      storageBucket: "newpos-dacb5.appspot.com",
+      messagingSenderId: "667100253940",
+      appId: "1:667100253940:web:cfd8f0b9b51b6e697818a1",
+      measurementId: "G-F5Q2JCNJ10"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    // default menu (fallback in case DB has no menu)
+    const defaultMenu = [
+      { category: "Starters", items:[{name:"Tomato Shorba",price:5},{name:"Paneer Tikka",price:8},{name:"Hara Bhara Kebab",price:6.5}]},
+      { category: "Curries", items:[{name:"Butter Chicken",price:16},{name:"Paneer Butter Masala",price:15}]}
+    ];
+
+    // start with fallback; we'll replace when DB value arrives
+    let menu = defaultMenu.slice();
+
+    // listen to /menu in Firebase and update UI in realtime whenever menu-editor.html writes changes
+    const menuRef = firebase.database().ref('menu');
+    menuRef.on('value', snap => {
+      const val = snap.val();
+      if(!val){
+        menu = defaultMenu.slice();
+      } else {
+        // Normalize possible structures:
+        if(Array.isArray(val)){
+          menu = val;
+        } else {
+          const keys = Object.keys(val || {});
+          const isNumericKeys = keys.length && keys.every(k => /^\d+$/.test(k));
+          if(isNumericKeys){
+            menu = keys.sort((a,b)=>Number(a)-Number(b)).map(k => val[k]);
+          } else {
+            if(val.menu && Array.isArray(val.menu)){
+              menu = val.menu;
+            } else {
+              const converted = [];
+              keys.forEach(k => {
+                const entry = val[k];
+                if(entry && typeof entry === 'object'){
+                  if(entry.category && Array.isArray(entry.items)){
+                    converted.push(entry);
+                  } else if (entry.items && Array.isArray(entry.items) && !entry.category){
+                    converted.push(Object.assign({ category: k }, entry));
+                  } else {
+                    if(Array.isArray(entry)){
+                      converted.push({ category: k, items: entry });
+                    }
+                  }
+                }
+              });
+              if(converted.length) menu = converted;
+              else {
+                try {
+                  const items = Object.values(val).filter(v => v && typeof v === 'object' && v.name).map(v => ({ name: v.name, price: v.price || 0 }));
+                  if(items.length) menu = [{ category: "Menu", items }];
+                  else menu = defaultMenu.slice();
+                } catch(e){
+                  menu = defaultMenu.slice();
+                }
+              }
+            }
+          }
+        }
+      }
+      if(!Array.isArray(menu) || menu.length === 0) menu = defaultMenu.slice();
+      if(currentTab >= menu.length) currentTab = 0;
+      renderMenuTabs();
+      renderMenuItems();
+    }, err => {
+      console.error('Failed to subscribe to menu:', err);
+    });
+
+    // state
+    let currentTab = 0;
+    let order = [];
+    let orderNote = "";
+    let scheduleTime = "";
+    let orderId = null;
+    let selectedOrderType = "";
+
+    const defaultQuickNotes = ["Spicy","No spicy","Mild","Vegan","Gluten free","Extra Cheese","No Onion","Less Oil","No Salt","Extra Sauce"];
+    let quickOptions = defaultQuickNotes.slice();
+    let quickSelected = [];
+
+    let itemQuickOptions = defaultQuickNotes.slice();
+    let itemSelected = [];
+    let currentItemIdx = null;
+
+    const quickMeta = {};
+    const itemQuickMeta = {};
+    function ensureMeta(){
+      quickOptions.forEach(q=>{ if(!quickMeta[q]) quickMeta[q] = { showDelete:false }; });
+      itemQuickOptions.forEach(q=>{ if(!itemQuickMeta[q]) itemQuickMeta[q] = { showDelete:false }; });
+    }
+
+    // Editing existing order id (from URL ?order=ID)
+    const urlParams = new URLSearchParams(window.location.search);
+    const editingOrderId = urlParams.get('order') || null;
+
+    // render functions (unchanged except they use dynamic menu variable)
+    function renderMenuTabs(){
+      const tabs = document.getElementById('menuTabs'); tabs.innerHTML='';
+      menu.forEach((cat,idx)=>{
+        const b = document.createElement('button'); b.type='button'; b.className='menu-tab' + (currentTab===idx ? ' active' : ''); b.textContent = cat.category || ('Category ' + (idx+1));
+        b.onclick = ()=>{ currentTab = idx; renderMenuTabs(); renderMenuItems(); };
+        tabs.appendChild(b);
+      });
+    }
+    function renderMenuItems(){
+      const container = document.getElementById('menuItems'); container.innerHTML='';
+      const items = (menu[currentTab] && Array.isArray(menu[currentTab].items)) ? menu[currentTab].items : [];
+      items.forEach(item=>{
+        const card = document.createElement('div'); card.className='menu-card'; card.tabIndex=0;
+        const t = document.createElement('div'); t.className='item-title'; t.textContent = item.name || 'Unnamed';
+        const p = document.createElement('div'); p.className='item-price'; p.textContent = '€'+((Number(item.price) || 0).toFixed(2));
+        card.appendChild(t); card.appendChild(p);
+        card.onclick = ()=> addToOrderSeparate(item);
+        card.onkeydown = (e)=> { if(e.key==='Enter') addToOrderSeparate(item); };
+        container.appendChild(card);
+      });
+      const placeholders = (3 - (items.length % 3)) % 3;
+      for(let i=0;i<placeholders;i++){ const ph=document.createElement('div'); ph.className='menu-card'; ph.style.visibility='hidden'; ph.style.pointerEvents='none'; container.appendChild(ph); }
+    }
+
+    // SEARCH
+    const searchInput = document.getElementById('menuSearchInput');
+    const searchResultsArea = document.getElementById('searchResultsArea');
+    const searchResultsContainer = document.getElementById('searchResults');
+    const searchResultsTitle = document.getElementById('searchResultsTitle');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+    function performSearch(q){
+      const query = String(q || '').trim().toLowerCase();
+      if(!query){
+        searchResultsArea.style.display = 'none';
+        return;
+      }
+      const matches = [];
+      (menu || []).forEach(cat=>{
+        (cat.items || []).forEach(item=>{
+          if(item.name && item.name.toLowerCase().includes(query)){
+            matches.push({ ...item, category: cat.category });
+          }
+        });
+      });
+      searchResultsContainer.innerHTML = '';
+      if(matches.length === 0){
+        searchResultsTitle.textContent = 'No items found';
+      } else {
+        searchResultsTitle.textContent = `Results (${matches.length}) — click item to add`;
+      }
+      matches.forEach(it=>{
+        const card = document.createElement('div'); card.className='menu-card'; card.tabIndex=0;
+        const t = document.createElement('div'); t.className='item-title'; t.textContent = it.name;
+        const catLine = document.createElement('div'); catLine.className='muted'; catLine.style.color='#8ea7bf'; catLine.style.fontSize='0.8rem'; catLine.textContent = it.category;
+        const p = document.createElement('div'); p.className='item-price'; p.textContent = '€'+(Number(it.price)||0).toFixed(2);
+        card.appendChild(t); card.appendChild(catLine); card.appendChild(p);
+        card.onclick = ()=> {
+          addToOrderSeparate(it);
+          searchInput.value = '';
+          searchResultsArea.style.display = 'none';
+          renderOrder();
+        };
+        searchResultsContainer.appendChild(card);
+      });
+      searchResultsArea.style.display = 'block';
+    }
+
+    searchInput.addEventListener('input', (e)=> {
+      performSearch(e.target.value);
+    });
+    searchInput.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape'){
+        searchInput.value=''; performSearch('');
+      }
+    });
+    clearSearchBtn.addEventListener('click', ()=> { searchInput.value=''; performSearch(''); searchInput.focus(); });
+
+    // Helper: determine if current order is editable (not completed/paid)
+    function isOrderEditable(){
+      if(editingOrderId){
+        const el = window.__editingOrderSnapshot || null;
+        if(!el) return true;
+        const s = (el.status || '').toString().toLowerCase();
+        return !(s === 'completed' || s === 'paid');
+      } else {
+        return true;
+      }
+    }
+
+    // add item (either local or update firebase for existing order)
+    function addToOrderSeparate(item){
+      if(editingOrderId){
+        const snap = window.__editingOrderSnapshot || null;
+        if(snap && ((snap.status || '').toString().toLowerCase() === 'completed' || (snap.status || '').toString().toLowerCase() === 'paid')){
+          return alert('This order is completed/paid and cannot be edited.');
+        }
+        const ref = firebase.database().ref('orders/' + editingOrderId);
+        ref.once('value').then(s => {
+          const data = s.val() || {};
+          const items = Array.isArray(data.items) ? data.items.slice() : [];
+          items.push({ name: item.name, price: item.price, qty: 1, note: '' });
+          const total = items.reduce((a,i)=> a + (i.price||0)*(i.qty||1), 0);
+          return ref.update({ items: items, total: total, updatedAt: Date.now() });
+        }).catch(err => {
+          console.error('Error adding item to existing order', err);
+          alert('Error adding item: ' + (err.message || err));
+        });
+      } else {
+        order.push({ name:item.name, price:(Number(item.price)||0), qty:1, note:'', selected:false });
+        renderOrder();
+      }
+    }
+
+    function changeQty(idx, delta){
+      if(editingOrderId){
+        const ref = firebase.database().ref('orders/' + editingOrderId);
+        ref.once('value').then(snap => {
+          const data = snap.val();
+          if(!data) return;
+          const items = Array.isArray(data.items) ? data.items.slice() : [];
+          if(!items[idx]) return;
+          items[idx].qty = (parseInt(items[idx].qty,10) || 1) + delta;
+          if(items[idx].qty <= 0) items.splice(idx,1);
+          const total = items.reduce((a,i)=> a + (i.price||0)*(i.qty||1), 0);
+          return ref.update({ items: items, total: total, updatedAt: Date.now() });
+        }).catch(err => { console.error(err); });
+      } else {
+        if(!order[idx]) return;
+        order[idx].qty += delta;
+        if(order[idx].qty <= 0) order.splice(idx,1);
+        renderOrder();
+      }
+    }
+    function removeItem(idx){
+      if(editingOrderId){
+        const ref = firebase.database().ref('orders/' + editingOrderId);
+        ref.once('value').then(snap => {
+          const data = snap.val();
+          if(!data) return;
+          const items = Array.isArray(data.items) ? data.items.slice() : [];
+          if(idx < 0 || idx >= items.length) return;
+          items.splice(idx,1);
+          const total = items.reduce((a,i)=> a + (i.price||0)*(i.qty||1), 0);
+          return ref.update({ items: items, total: total, updatedAt: Date.now() });
+        }).catch(err => { console.error(err); });
+      } else {
+        if(!order[idx]) return;
+        order.splice(idx,1);
+        renderOrder();
+      }
+    }
+
+    function renderOrder(){
+      const list = document.getElementById('orderList'); list.innerHTML='';
+      order.forEach((it, idx)=>{
+        const itemDiv = document.createElement('div'); itemDiv.className='order-item'; if(it.selected) itemDiv.classList.add('selected');
+
+        const top = document.createElement('div'); top.className='top';
+        const name = document.createElement('div'); name.className='name'; name.textContent = it.name; name.title = it.name;
+        name.addEventListener('click', (e)=>{ e.stopPropagation(); if(isOrderEditable()){ it.selected = !it.selected; renderOrder(); } });
+
+        const right = document.createElement('div'); right.className='right-group';
+        const price = document.createElement('div'); price.className='price'; price.textContent = '€' + (it.price * it.qty).toFixed(2);
+
+        const qty = document.createElement('div'); qty.className='qty';
+        const btnMinus = document.createElement('button'); btnMinus.className='qty-btn'; btnMinus.type='button'; btnMinus.textContent='-'; btnMinus.onclick=(e)=>{ e.stopPropagation(); changeQty(idx,-1); };
+        const qtyVal = document.createElement('div'); qtyVal.className='qty-val'; qtyVal.textContent = it.qty;
+        const btnPlus = document.createElement('button'); btnPlus.className='qty-btn'; btnPlus.type='button'; btnPlus.textContent='+'; btnPlus.onclick=(e)=>{ e.stopPropagation(); changeQty(idx,1); };
+        qty.appendChild(btnMinus); qty.appendChild(qtyVal); qty.appendChild(btnPlus);
+
+        const noteBtn = document.createElement('button'); noteBtn.className='note-btn'; noteBtn.type='button'; noteBtn.innerHTML = '<i class="fas fa-tags"></i>'; noteBtn.onclick=(e)=>{ e.stopPropagation(); openItemQuickNotePopup(idx); };
+
+        const delBtn = document.createElement('button'); delBtn.className='del-btn'; delBtn.type='button'; delBtn.innerHTML = '<i class="fas fa-trash"></i>'; delBtn.onclick=(e)=>{ e.stopPropagation(); removeItem(idx); };
+
+        right.appendChild(price); right.appendChild(qty); right.appendChild(noteBtn); right.appendChild(delBtn);
+
+        top.appendChild(name); top.appendChild(right);
+        itemDiv.appendChild(top);
+
+        if(it.note && String(it.note).trim()){
+          const qline = document.createElement('div'); qline.className='quicknote-line'; qline.textContent = it.note;
+          itemDiv.appendChild(qline);
+        }
+
+        list.appendChild(itemDiv);
+      });
+
+      const total = order.reduce((a,i)=> a + i.price * i.qty, 0);
+      document.getElementById('orderTotal').textContent = 'Total: €' + total.toFixed(2);
+
+      // order-level quicknote
+      const ol = document.getElementById('orderLevelQuicknoteLine');
+      if(orderNote && orderNote.length){
+        ol.style.display = 'block';
+        ol.textContent = orderNote;
+      } else {
+        ol.style.display = 'none';
+        ol.textContent = '';
+      }
+
+      // If editing existing order and it's not editable, disable UI interactions
+      const editable = isOrderEditable();
+      // disable menu cards
+      document.querySelectorAll('.menu-card').forEach(c => c.style.pointerEvents = editable ? 'auto' : 'none');
+      // disable add/remove controls visually (we just disable the action buttons)
+      document.getElementById('payBtn').disabled = !editable;
+      document.getElementById('holdBtn').disabled = !editable;
+    }
+
+    // schedule handlers
+    document.getElementById('scheduleBtn').addEventListener('click', ()=>{
+      const row = document.getElementById('scheduleRow'); row.style.display = (row.style.display==='flex' || row.style.display==='block') ? 'none' : 'flex';
+    });
+    document.getElementById('clearScheduleBtn').addEventListener('click', ()=>{ scheduleTime=''; document.getElementById('scheduleField').value=''; document.getElementById('scheduleRow').style.display='none'; if(editingOrderId) firebase.database().ref('orders/' + editingOrderId).update({ scheduledTime: "", updatedAt: Date.now() }); });
+    document.getElementById('scheduleField').addEventListener('change', (e)=> { scheduleTime = e.target.value; if(editingOrderId) firebase.database().ref('orders/' + editingOrderId).update({ scheduledTime: scheduleTime, updatedAt: Date.now() }); });
+
+    // Quicknote (order-level)
+    function openQuickNotePopup(){ ensureMeta(); document.getElementById('quickNotePopup').style.display='flex'; renderQuickGrid(); document.getElementById('quickCustomInput').value=''; }
+    function closeQuickNotePopup(){ document.getElementById('quickNotePopup').style.display='none'; }
+    function renderQuickGrid(){
+      ensureMeta();
+      const grid = document.getElementById('quickGrid'); grid.innerHTML='';
+      quickOptions.forEach((q,i)=>{
+        const chip = document.createElement('div'); chip.className='chip'; chip.textContent = q;
+        if(quickSelected.includes(q)) chip.classList.add('selected');
+        const editBtn = document.createElement('button'); editBtn.className='chip-edit'; editBtn.type='button'; editBtn.innerHTML = '<i class="fas fa-edit"></i>'; editBtn.title='Edit / show delete';
+        editBtn.onclick = (ev)=>{ ev.stopPropagation(); quickMeta[q] = quickMeta[q] || { showDelete:false }; quickMeta[q].showDelete = !quickMeta[q].showDelete; if(quickMeta[q].showDelete) chip.classList.add('show-delete'); else chip.classList.remove('show-delete'); };
+        const delBtn = document.createElement('button'); delBtn.className='chip-delete'; delBtn.type='button'; delBtn.innerHTML='×'; delBtn.title='Delete';
+        delBtn.onclick = (ev)=>{ ev.stopPropagation(); if(!confirm('Delete quick note "'+q+'"?')) return; quickOptions.splice(i,1); quickSelected = quickSelected.filter(x=>x!==q); delete quickMeta[q]; renderQuickGrid(); };
+        chip.ondblclick = (ev)=>{ ev.stopPropagation(); const nv = prompt('Edit quick note', q); if(nv===null) return; const t = nv.trim(); if(!t){ alert('Name cannot be empty'); return; } quickOptions[i]=t; quickSelected = quickSelected.map(s=>s===q?t:s); quickMeta[t]=quickMeta[q]||{showDelete:false}; delete quickMeta[q]; renderQuickGrid(); };
+        chip.onclick = (ev)=>{ if(ev.target === editBtn || ev.target === delBtn) return; if(quickSelected.includes(q)) quickSelected = quickSelected.filter(x=>x!==q); else quickSelected.push(q); renderQuickGrid(); };
+        chip.appendChild(editBtn); chip.appendChild(delBtn); grid.appendChild(chip);
+      });
+    }
+    document.getElementById('quickAddBtn').addEventListener('click', ()=>{ const v = document.getElementById('quickCustomInput').value.trim(); if(!v) return; if(quickOptions.includes(v)){ alert('Already exists'); document.getElementById('quickCustomInput').value=''; return; } quickOptions.push(v); quickSelected.push(v); quickMeta[v] = { showDelete:false }; document.getElementById('quickCustomInput').value=''; renderQuickGrid(); });
+    document.getElementById('quickConfirmBtn').addEventListener('click', ()=>{
+      orderNote = quickSelected.join(', ');
+      if(editingOrderId){
+        firebase.database().ref('orders/' + editingOrderId).update({ note: orderNote, quickNotes: quickSelected.join(', '), updatedAt: Date.now() });
+      }
+      closeQuickNotePopup();
+      renderOrder();
+    });
+    document.getElementById('quickCancelBtn').addEventListener('click', closeQuickNotePopup);
+    document.getElementById('quickNoteBtn').addEventListener('click', openQuickNotePopup);
+
+    // item quicknote popup
+    function openItemQuickNotePopup(idx){
+      currentItemIdx = idx;
+      if(editingOrderId){
+        const snap = window.__editingOrderSnapshot || null;
+        const noteStr = (snap && snap.items && snap.items[idx] && snap.items[idx].note) ? String(snap.items[idx].note) : '';
+        itemSelected = noteStr ? noteStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      } else {
+        const noteStr = (order[idx] && order[idx].note) ? String(order[idx].note) : '';
+        itemSelected = noteStr ? noteStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      }
+      ensureMeta();
+      document.getElementById('itemQuickNotePopup').style.display='flex';
+      renderItemQuickGrid();
+      document.getElementById('itemQuickCustomInput').value='';
+    }
+    function closeItemQuickNotePopup(){ document.getElementById('itemQuickNotePopup').style.display='none'; currentItemIdx=null; itemSelected=[]; }
+    function renderItemQuickGrid(){
+      ensureMeta();
+      const grid = document.getElementById('itemQuickGrid'); grid.innerHTML='';
+      itemQuickOptions.forEach((q,i)=>{
+        const chip = document.createElement('div'); chip.className='chip'; chip.textContent=q;
+        if(itemSelected.includes(q)) chip.classList.add('selected');
+        const editBtn = document.createElement('button'); editBtn.className='chip-edit'; editBtn.type='button'; editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+        editBtn.onclick = (ev)=>{ ev.stopPropagation(); itemQuickMeta[q] = itemQuickMeta[q] || { showDelete:false }; itemQuickMeta[q].showDelete = !itemQuickMeta[q].showDelete; if(itemQuickMeta[q].showDelete) chip.classList.add('show-delete'); else chip.classList.remove('show-delete'); };
+        const delBtn = document.createElement('button'); delBtn.className='chip-delete'; delBtn.type='button'; delBtn.innerHTML='×'; delBtn.title='Delete';
+        delBtn.onclick = (ev)=>{ ev.stopPropagation(); if(!confirm('Delete quick note "'+q+'"?')) return; itemQuickOptions.splice(i,1); itemSelected = itemSelected.filter(x=>x!==q); delete itemQuickMeta[q]; renderItemQuickGrid(); };
+        chip.ondblclick = (ev)=>{ ev.stopPropagation(); const nv = prompt('Edit quick note', q); if(nv===null) return; const t = nv.trim(); if(!t){ alert('Name cannot be empty'); return; } itemQuickOptions[i] = t; itemSelected = itemSelected.map(s=>s===q?t:s); renderItemQuickGrid(); };
+        chip.onclick = (ev)=>{ if(ev.target === editBtn || ev.target === delBtn) return; if(itemSelected.includes(q)) itemSelected = itemSelected.filter(x=>x!==q); else itemSelected.push(q); renderItemQuickGrid(); };
+        chip.appendChild(editBtn); chip.appendChild(delBtn); grid.appendChild(chip);
+      });
+    }
+    document.getElementById('itemQuickAddBtn').addEventListener('click', ()=>{ const v = document.getElementById('itemQuickCustomInput').value.trim(); if(!v) return; if(itemQuickOptions.includes(v)){ alert('Already exists'); document.getElementById('itemQuickCustomInput').value=''; return; } itemQuickOptions.push(v); itemSelected.push(v); itemQuickMeta[v] = { showDelete:false }; document.getElementById('itemQuickCustomInput').value=''; renderItemQuickGrid(); });
+    document.getElementById('itemQuickConfirmBtn').addEventListener('click', ()=>{
+      const chosen = itemSelected.join(', ');
+      if(currentItemIdx === null){ closeItemQuickNotePopup(); return; }
+      if(editingOrderId){
+        const ref = firebase.database().ref('orders/' + editingOrderId);
+        ref.once('value').then(snap => {
+          const data = snap.val() || {};
+          const items = Array.isArray(data.items) ? data.items.slice() : [];
+          if(!items[currentItemIdx]) return;
+          items[currentItemIdx].note = chosen;
+          return ref.update({ items: items, updatedAt: Date.now() });
+        }).catch(err => console.error(err));
+      } else {
+        if(!order[currentItemIdx]) { closeItemQuickNotePopup(); return; }
+        order[currentItemIdx].note = chosen;
+        renderOrder();
+      }
+      closeItemQuickNotePopup();
+    });
+    document.getElementById('itemQuickCancelBtn').addEventListener('click', closeItemQuickNotePopup);
+
+    // order-type modal behavior
+    function openOrderTypeModal(){ document.getElementById('orderTypeModal').style.display='flex'; renderTypeGrid(); }
+    function renderTypeGrid(){ const g = document.getElementById('typeGrid'); g.innerHTML=''; for(let i=1;i<=16;i++){ const c=document.createElement('div'); c.className='table-cell'; c.textContent=i; c.onclick=()=>{ selectedOrderType='Table '+i; document.getElementById('tableTitle').textContent = selectedOrderType; document.querySelectorAll('.table-cell').forEach(e=>e.classList.remove('selected')); c.classList.add('selected'); }; g.appendChild(c); } }
+    document.getElementById('orderTypeBtn').addEventListener('click', openOrderTypeModal);
+
+    // Wolt/TA/Online select like table cells
+    document.getElementById('typeWolt').addEventListener('click', (e)=> selectQuickType(e.currentTarget));
+    document.getElementById('typeTA').addEventListener('click', (e)=> selectQuickType(e.currentTarget));
+    document.getElementById('typeOnline').addEventListener('click', (e)=> selectQuickType(e.currentTarget));
+    function selectQuickType(btn){
+      document.querySelectorAll('.type-actions .order-type-option').forEach(b => b.classList.remove('selected'));
+      document.querySelectorAll('.table-cell').forEach(c => c.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedOrderType = btn.dataset.type;
+    }
+
+    document.getElementById('confirmOrderType').addEventListener('click', ()=>{
+      const custom = document.getElementById('customOrderInput').value.trim();
+      if(custom) selectedOrderType = custom;
+      if(!selectedOrderType || selectedOrderType === ''){
+        alert('Please select a table or order type (Wolt / Take Away / Online) or enter a custom name.');
+        return;
+      }
+      document.getElementById('tableTitle').textContent = selectedOrderType;
+      document.getElementById('orderTypeModal').style.display='none';
+      if(editingOrderId){
+        firebase.database().ref('orders/' + editingOrderId).update({ table: selectedOrderType, updatedAt: Date.now() });
+      }
+    });
+    document.getElementById('cancelOrderType').addEventListener('click', ()=>{ document.getElementById('orderTypeModal').style.display='none'; });
+
+    // Payment / Hold logic with required order type
+    document.getElementById('payBtn').addEventListener('click', ()=>{
+      if(!isOrderEditable()){ return alert('This order is completed and cannot be changed.'); }
+      if(!selectedOrderType || selectedOrderType === ''){
+        openOrderTypeModal();
+        return;
+      }
+      if(editingOrderId){
+        firebase.database().ref('orders/' + editingOrderId).once('value').then(snap=>{
+          const d = snap.val() || {};
+          const items = Array.isArray(d.items) ? d.items : [];
+          if(items.length === 0) return alert('Add items to order!');
+          openPaymentDialog();
+        });
+      } else {
+        if(order.length === 0) return alert('Add items to order!');
+        openPaymentDialog();
+      }
+    });
+
+    document.getElementById('holdBtn').addEventListener('click', ()=>{
+      if(!isOrderEditable()){ return alert('This order is completed and cannot be changed.'); }
+      if(!selectedOrderType || selectedOrderType === ''){
+        openOrderTypeModal();
+        return;
+      }
+      if(editingOrderId){
+        firebase.database().ref('orders/' + editingOrderId).once('value').then(snap=>{
+          const d = snap.val() || {};
+          const items = Array.isArray(d.items) ? d.items : [];
+          if(items.length === 0) return alert('Add items to order!');
+          firebase.database().ref('orders/' + editingOrderId).update({
+            status: 'pending',
+            paymentType: null,
+            table: selectedOrderType,
+            note: orderNote || "",
+            scheduledTime: scheduleTime || "",
+            quickNotes: quickSelected.join(', '),
+            updatedAt: Date.now()
+          }).then(()=> {
+            window.location.href = 'home.html';
+          }).catch(err => { alert('Error saving hold: ' + (err.message||err)); });
+        });
+      } else {
+        if(order.length === 0) return alert('Add items to order!');
+        sendOrderToFirebase('pending', null);
+      }
+    });
+
+    // Payment dialog wiring
+    function openPaymentDialog(){
+      document.getElementById('paymentDialog').style.display='flex';
+    }
+    function closePaymentDialog(){ document.getElementById('paymentDialog').style.display='none'; }
+
+    document.getElementById('payCashBtn').addEventListener('click', ()=> onPaymentTypeSelect('cash'));
+    document.getElementById('payCardBtn').addEventListener('click', ()=> onPaymentTypeSelect('card'));
+    document.getElementById('payWoltBtn').addEventListener('click', ()=> onPaymentTypeSelect('wolt'));
+    document.getElementById('payOnlineBtn').addEventListener('click', ()=> onPaymentTypeSelect('online'));
+    document.getElementById('payCancelBtn').addEventListener('click', ()=> closePaymentDialog());
+
+    function onPaymentTypeSelect(type){
+      if(!selectedOrderType || selectedOrderType===''){
+        openOrderTypeModal();
+        return;
+      }
+      if(editingOrderId){
+        firebase.database().ref('orders/' + editingOrderId).once('value').then(snap=>{
+          const d = snap.val() || {};
+          const items = Array.isArray(d.items) ? d.items : [];
+          if(items.length === 0) return alert('Add items to order!');
+          const now = Date.now();
+          firebase.database().ref('orders/' + editingOrderId).update({
+            status: 'paid',
+            paymentType: type,
+            completedAt: now,
+            updatedAt: now,
+            table: selectedOrderType,
+            note: orderNote || "",
+            scheduledTime: scheduleTime || "",
+            quickNotes: quickSelected.join(', ')
+          }).then(()=> {
+            closePaymentDialog();
+            window.location.href = 'home.html';
+          }).catch(err => { alert('Error marking paid: ' + (err.message||err)); });
+        });
+      } else {
+        sendOrderToFirebase('paid', type);
+      }
+    }
+
+    // show/hide saving overlay
+    function showSavingOverlay(msg){
+      const ov = document.getElementById('savingOverlay');
+      const text = document.getElementById('savingText');
+      text.textContent = msg || 'Saving order...';
+      ov.style.display = 'flex';
+    }
+    function hideSavingOverlay(){
+      document.getElementById('savingOverlay').style.display = 'none';
+    }
+
+    // send order to Firebase and then redirect to home.html
+    function sendOrderToFirebase(status, payType){
+      if(order.length === 0){
+        alert('Order is empty');
+        return;
+      }
+      showSavingOverlay(status === 'paid' ? 'Processing payment...' : 'Saving order...');
+      getNextOrderId(next=>{
+        const table = selectedOrderType && selectedOrderType !== '' ? selectedOrderType : getTableNumber();
+        const now = new Date();
+        const data = {
+          id: next,
+          table: table,
+          items: order.map(i => ({ name: i.name, price: i.price, qty: i.qty, note: (i.note || ''), done: !!i.done })),
+          total: order.reduce((a,i) => a + i.price * i.qty, 0),
+          status: status,
+          paymentType: payType || null,
+          note: orderNote || "",
+          scheduledTime: scheduleTime || "",
+          quickNotes: quickSelected.join(', '),
+          date: now.toISOString().slice(0,10),
+          time: now.toTimeString().slice(0,8),
+          createdAt: now.getTime(),
+          updatedAt: now.getTime()
+        };
+        firebase.database().ref('orders/' + next).set(data)
+          .then(() => {
+            order = [];
+            orderNote = "";
+            quickSelected = [];
+            renderOrder();
+            hideSavingOverlay();
+            window.location.href = 'home.html';
+          })
+          .catch(err => {
+            hideSavingOverlay();
+            console.error('Error saving order', err);
+            alert('Error saving order: ' + (err && err.message ? err.message : 'unknown'));
+          });
+      });
+    }
+
+    function getTableNumber(){ const params = new URLSearchParams(window.location.search); const t = params.get('table'); return t ? t : 'Take Away'; }
+
+    function getNextOrderId(cb){
+      const counterRef = firebase.database().ref('counters/nextOrderId');
+      counterRef.transaction(function(current){
+        return (current || 0) + 1;
+      }, function(error, committed, snapshot){
+        if(error){
+          console.error('getNextOrderId transaction error', error);
+          const pushKey = firebase.database().ref('orders').push().key;
+          cb(pushKey);
+        } else if(!committed){
+          const pushKey = firebase.database().ref('orders').push().key;
+          cb(pushKey);
+        } else {
+          const next = snapshot.val();
+          cb(next);
+        }
+      });
+    }
+
+    // initialize UI
+    renderMenuTabs(); renderMenuItems(); renderOrder();
+    (function init(){
+      document.getElementById('tableTitle').textContent = 'Select Order Type';
+      document.getElementById('orderIdTag').textContent = '';
+
+      if(editingOrderId){
+        document.getElementById('orderIdTag').textContent = 'Order ID: ' + editingOrderId;
+        const ref = firebase.database().ref('orders/' + editingOrderId);
+        ref.on('value', snap => {
+          const d = snap.val();
+          window.__editingOrderSnapshot = d || null;
+          if(!d){
+            console.warn('Order', editingOrderId, 'not found in firebase');
+            return;
+          }
+          order = Array.isArray(d.items) ? d.items.map(it => ({
+            name: it.name,
+            price: it.price,
+            qty: it.qty,
+            note: it.note || '',
+            done: !!it.done,
+            selected: false
+          })) : [];
+          orderNote = d.note || "";
+          scheduleTime = d.scheduledTime || "";
+          selectedOrderType = d.table || "";
+          document.getElementById('tableTitle').textContent = selectedOrderType || 'Select Order Type';
+          if(scheduleTime) {
+            document.getElementById('scheduleField').value = scheduleTime;
+            document.getElementById('scheduleRow').style.display = 'flex';
+          } else {
+            document.getElementById('scheduleField').value = '';
+            document.getElementById('scheduleRow').style.display = 'none';
+          }
+          renderOrder();
+          orderId = d.id || editingOrderId;
+          const s = (d.status || '').toString().toLowerCase();
+          if(s === 'paid' || s === 'completed'){
+            document.querySelectorAll('.menu-card').forEach(c => c.style.pointerEvents = 'none');
+            document.getElementById('payBtn').disabled = true;
+            document.getElementById('holdBtn').disabled = true;
+          } else {
+            document.querySelectorAll('.menu-card').forEach(c => c.style.pointerEvents = 'auto');
+            document.getElementById('payBtn').disabled = false;
+            document.getElementById('holdBtn').disabled = false;
+          }
+        });
+      }
+    })();
+
+    // keyboard: close modals
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        document.getElementById('quickNotePopup').style.display='none';
+        document.getElementById('itemQuickNotePopup').style.display='none';
+        document.getElementById('orderTypeModal').style.display='none';
+        closePaymentDialog();
+        hideSavingOverlay();
+      }
+    });
+  </script>
+</body>
+</html>

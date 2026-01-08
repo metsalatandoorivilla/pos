@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Main Page</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background-color: #333;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      z-index: 1000;
+    }
+
+    header button {
+      background-color: #555;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+
+    header button:hover {
+      background-color: #777;
+    }
+
+    iframe {
+      flex: 1;
+      border: none;
+      margin-top: 60px; /* height of header */
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <button onclick="loadPage('order.html')">New Order</button>
+    <button onclick="loadPage('home.html')">Kitchen Screen</button>
+  </header>
+
+  <iframe id="contentFrame" src="home.html"></iframe>
+
+  <script>
+    function loadPage(page) {
+      document.getElementById('contentFrame').src = page;
+    }
+  </script>
+</body>
+</html>

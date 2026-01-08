@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Restaurant Dashboard — Orders</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+
+  <style>
+    :root{
+      --bg: linear-gradient(180deg,#07142a,#00121a);
+      --card: #0f1720;
+      --muted: #9fb7cf;
+      --accent: #bbdefb;
+      --primary: #42a5f5;
+      --success: #43a047;
+      --danger: #e53935;
+      --panel-border: rgba(255,255,255,0.04);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:"Poppins",sans-serif;background:var(--bg);color:#eaf4ff;-webkit-font-smoothing:antialiased}
+    .wrap{max-width:1200px;margin:18px auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+    .topbar{display:flex;gap:12px;align-items:center}
+    .title{font-weight:700;color:var(--accent);font-size:1.15rem;display:flex;align-items:center;gap:10px}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{background:var(--primary);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+    .btn.small{padding:6px 8px;font-size:0.9rem}
+    .btn.ghost{background:transparent;border:1px solid var(--panel-border);color:var(--accent)}
+    .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    input[type="date"], input[type="text"], select{background:transparent;border:1px solid var(--panel-border);color:#eaf4ff;padding:8px;border-radius:8px}
+    .search{min-width:220px}
+
+    /* summary */
+    .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:10px}
+    .card{background:var(--card);border-radius:10px;padding:12px;border:1px solid var(--panel-border);box-shadow:0 6px 20px rgba(0,0,0,0.35)}
+    .card h3{margin:0;color:var(--muted);font-weight:700;font-size:0.95rem}
+    .card .value{font-size:1.4rem;font-weight:800;margin-top:8px;color:#fff}
+
+    /* layout */
+    .main-row{display:grid;grid-template-columns:1fr 420px;gap:12px;margin-top:12px}
+    @media (max-width:900px){ .main-row{grid-template-columns:1fr} }
+
+    .chart-box{background:var(--card);border-radius:10px;padding:12px;height:230px;border:1px solid var(--panel-border);display:flex;flex-direction:column;gap:8px}
+    .list-box{background:var(--card);border-radius:10px;padding:12px;border:1px solid var(--panel-border);max-height:520px;overflow:auto}
+
+    table{width:100%;border-collapse:collapse;font-size:0.95rem}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left}
+    th{color:var(--muted);font-weight:700;font-size:0.85rem}
+    tr:hover{background:rgba(66,165,245,0.02)}
+    .status-pill{padding:6px 8px;border-radius:999px;font-weight:700;font-size:0.82rem}
+    .status-paid{background:rgba(67,160,71,0.12);color:var(--success)}
+    .status-completed{background:rgba(67,160,71,0.08);color:var(--muted)}
+    .status-pending{background:rgba(255,255,255,0.03);color:var(--muted)}
+    .status-delayed{background:rgba(229,57,53,0.12);color:var(--danger)}
+
+    .small-muted{color:var(--muted);font-size:0.9rem;margin-top:6px}
+
+    /* modal */
+    .modal { display:none; position:fixed; inset:0; background:rgba(2,6,12,0.7); z-index:1200; align-items:center; justify-content:center; padding:18px; }
+    .modal.show{display:flex}
+    .modal-content{background:var(--card);border-radius:10px;padding:16px;width:100%;max-width:720px;max-height:90vh;overflow:auto;border:1px solid var(--panel-border)}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .modal-body{margin-top:12px}
+    .modal-table{width:100%;border-collapse:collapse}
+    .modal-table th, .modal-table td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)}
+
+    .footer{margin-top:12px;color:var(--muted);font-size:0.9rem}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title"><i class="fas fa-chart-line"></i> Restaurant Dashboard</div>
+
+      <div class="controls">
+        <div class="filters">
+          <select id="presetRange">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="all">All</option>
+          </select>
+
+          <input id="startDate" type="date" />
+          <input id="endDate" type="date" />
+          <input id="searchInput" class="search" type="text" placeholder="Search order id / table / item..." />
+          <button id="applyFilter" class="btn small">Apply</button>
+          <button id="clearFilter" class="btn small ghost">Clear</button>
+        </div>
+
+        <button id="refreshBtn" class="btn small ghost" title="Refresh now"><i class="fas fa-sync"></i></button>
+        <button id="exportCsvBtn" class="btn small"><i class="fas fa-file-csv"></i></button>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="card">
+        <h3>Total orders</h3>
+        <div id="kTotal" class="value">0</div>
+        <div class="small-muted">Orders in selected range</div>
+      </div>
+
+      <div class="card">
+        <h3>Sales</h3>
+        <div id="kSales" class="value">€0.00</div>
+        <div class="small-muted">Sum of totals</div>
+      </div>
+
+      <div class="card">
+        <h3>Completed</h3>
+        <div id="kCompleted" class="value">0</div>
+        <div class="small-muted">Marked completed</div>
+      </div>
+
+      <div class="card">
+        <h3>Pending</h3>
+        <div id="kPending" class="value">0</div>
+        <div class="small-muted">Open / pending</div>
+      </div>
+
+      <div class="card">
+        <h3>Payments</h3>
+        <div id="kPayments" class="value" style="font-size:1rem">Cash:0 Card:0 Wolt:0 Online:0</div>
+        <div class="small-muted">Counts by payment method</div>
+      </div>
+
+      <div class="card">
+        <h3>Avg order</h3>
+        <div id="kAvg" class="value">€0.00</div>
+        <div class="small-muted">Average order value</div>
+      </div>
+    </div>
+
+    <div class="main-row">
+      <div class="chart-box">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Orders Over Time</strong>
+            <div class="small-muted">Daily counts (smaller view)</div>
+          </div>
+          <div>
+            <button id="toggleChart" class="btn small ghost">Toggle Chart</button>
+          </div>
+        </div>
+        <canvas id="ordersChart" style="flex:1;width:100%;height:1px;"></canvas>
+      </div>
+
+      <div class="list-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div><strong>All Orders</strong><div class="small-muted">Click an order row to view details</div></div>
+          <div><button id="showAllBtn" class="btn small ghost">Show all</button></div>
+        </div>
+
+        <div style="overflow:auto;max-height:300px">
+          <table>
+            <thead>
+              <tr>
+                <th>Order #</th>
+                <th>Table</th>
+                <th>Total</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTbody"></tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button id="exportFilteredCsv" class="btn small">Export Shown CSV</button>
+          <button id="clearCompleted" class="btn small ghost">Clear Completed</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">This dashboard reads orders from Firebase /orders and updates live. Use filters to narrow the data and click any order row to inspect details.</div>
+  </div>
+
+  <!-- Order details modal -->
+  <div id="orderModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <strong id="modalTitle">Order #</strong>
+          <div id="modalMeta" class="small-muted"></div>
+        </div>
+        <div>
+          <button id="modalOpenBtn" class="btn small ghost">Open in Order Page</button>
+          <button id="modalCloseBtn" class="btn small">Close</button>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <table class="modal-table" id="modalItemsTable">
+          <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+          <tbody></tbody>
+        </table>
+
+        <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="small-muted">Payment: <span id="modalPayment">—</span></div>
+            <div class="small-muted">Status: <span id="modalStatus">—</span></div>
+            <div class="small-muted">Scheduled: <span id="modalSched">—</span></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="modalMarkDone" class="btn small">Mark Completed</button>
+            <button id="modalPrint" class="btn small ghost">Print</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+    // Firebase config (same as your other pages)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZCm8Fmp-zNlb2D20gqLCyifky-hGtZvI",
+      authDomain: "newpos-dacb5.firebaseapp.com",
+      databaseURL: "https://newpos-dacb5-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "newpos-dacb5",
+      storageBucket: "newpos-dacb5.appspot.com",
+      messagingSenderId: "667100253940",
+      appId: "1:667100253940:web:cfd8f0b9b51b6e697818a1",
+      measurementId: "G-F5Q2JCNJ10"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const ordersRef = firebase.database().ref('orders');
+
+    // UI elements
+    const presetRange = document.getElementById('presetRange');
+    const startDateEl = document.getElementById('startDate');
+    const endDateEl = document.getElementById('endDate');
+    const searchInput = document.getElementById('searchInput');
+    const applyFilter = document.getElementById('applyFilter');
+    const clearFilter = document.getElementById('clearFilter');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const exportFilteredCsv = document.getElementById('exportFilteredCsv');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const ordersTbody = document.getElementById('ordersTbody');
+    const kTotal = document.getElementById('kTotal');
+    const kSales = document.getElementById('kSales');
+    const kCompleted = document.getElementById('kCompleted');
+    const kPending = document.getElementById('kPending');
+    const kPayments = document.getElementById('kPayments');
+    const kAvg = document.getElementById('kAvg');
+    const ordersChartCanvas = document.getElementById('ordersChart');
+
+    // modal refs
+    const orderModal = document.getElementById('orderModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMeta = document.getElementById('modalMeta');
+    const modalItemsBody = document.querySelector('#modalItemsTable tbody');
+    const modalPayment = document.getElementById('modalPayment');
+    const modalStatus = document.getElementById('modalStatus');
+    const modalSched = document.getElementById('modalSched');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+    const modalOpenBtn = document.getElementById('modalOpenBtn');
+    const modalMarkDone = document.getElementById('modalMarkDone');
+    const modalPrint = document.getElementById('modalPrint');
+
+    // state
+    let ordersCache = {};
+    let chart = null;
+    let chartMode = 'bar';
+    let currentModalOrder = null;
+
+    // helpers
+    function todayStr(offset=0){
+      const d = new Date(); d.setDate(d.getDate()+offset); return d.toISOString().slice(0,10);
+    }
+    function parseOrderCreated(o){
+      if(o.createdAt) return Number(o.createdAt);
+      if(o.date && o.time) return new Date(o.date + 'T' + (o.time || '00:00:00')).getTime();
+      return Date.now();
+    }
+    function parseScheduledMs(o){
+      const st = o.scheduledTime || o.scheduled;
+      if(!st) return null;
+      try {
+        const s = String(st).trim();
+        if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){
+          const datePart = o.scheduledDate || o.date || todayStr();
+          const timePart = s.length <=5 ? s + ':00' : s;
+          const dt = new Date(datePart + 'T' + timePart);
+          if(!isNaN(dt.getTime())) return dt.getTime();
+        }
+        const dp = Date.parse(s);
+        if(!isNaN(dp)) return dp;
+      } catch(e){}
+      return null;
+    }
+    function formatHMS(sec){
+      sec = Math.max(0, Math.floor(sec));
+      const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+      return [h,m,s].map(n => String(n).padStart(2,'0')).join(':');
+    }
+
+    // filtering and aggregation
+    function getFilteredOrders(){
+      const arr = Object.values(ordersCache).map(o => { if(!o.createdAt) o.createdAt = parseOrderCreated(o); return o; });
+      let s = startDateEl.value;
+      let e = endDateEl.value;
+      if(!s && !e && presetRange.value && presetRange.value !== 'all'){
+        const v = presetRange.value;
+        if(v === 'today'){ s = todayStr(); e = todayStr(); }
+        else if(v === 'yesterday'){ s = todayStr(-1); e = todayStr(-1); }
+        else if(!isNaN(parseInt(v))){ s = todayStr(- (parseInt(v)-1)); e = todayStr(); }
+      }
+      const startMs = s ? new Date(s + 'T00:00:00').getTime() : -Infinity;
+      const endMs = e ? new Date(e + 'T23:59:59').getTime() : Infinity;
+      const search = (searchInput.value || '').trim().toLowerCase();
+
+      return arr.filter(o => {
+        const created = Number(o.createdAt || parseOrderCreated(o));
+        if(created < startMs || created > endMs) return false;
+        if(search){
+          if(String(o.id||'').toLowerCase().includes(search)) return true;
+          if(String(o.table||'').toLowerCase().includes(search)) return true;
+          const items = Array.isArray(o.items) ? o.items : [];
+          for(const it of items) if((it.name||'').toString().toLowerCase().includes(search)) return true;
+          return false;
+        }
+        return true;
+      }).sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    }
+
+    function computeKPIs(filtered){
+      const totalOrders = filtered.length;
+      let sales = 0, completed = 0, pending = 0;
+      const payments = { cash:0, card:0, wolt:0, online:0, unknown:0 };
+      filtered.forEach(o => {
+        const t = Number(o.total || 0); sales += t;
+        const st = (o.status||'').toString().toLowerCase();
+        if(st === 'completed') completed++; else pending++;
+        const pay = (o.paymentType || o.payment || '').toString().toLowerCase();
+        if(pay.includes('cash')) payments.cash++;
+        else if(pay.includes('card')) payments.card++;
+        else if(pay.includes('wolt')) payments.wolt++;
+        else if(pay.includes('online') || pay.includes('website')) payments.online++;
+        else payments.unknown++;
+      });
+      const avg = totalOrders ? (sales/totalOrders) : 0;
+      return { totalOrders, sales, completed, pending, payments, avg };
+    }
+
+    // render simplified list with order number, table and price
+    function renderOrdersList(filtered){
+      ordersTbody.innerHTML = '';
+      filtered.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', () => openOrderModal(o.id));
+
+        const idTd = document.createElement('td'); idTd.textContent = o.id || '';
+        const tableTd = document.createElement('td'); tableTd.textContent = o.table || '';
+        const totalTd = document.createElement('td'); totalTd.textContent = '€' + (Number(o.total)||0).toFixed(2);
+        const timeTd = document.createElement('td'); timeTd.textContent = new Date(o.createdAt||parseOrderCreated(o)).toLocaleString();
+
+        tr.appendChild(idTd);
+        tr.appendChild(tableTd);
+        tr.appendChild(totalTd);
+        tr.appendChild(timeTd);
+
+        ordersTbody.appendChild(tr);
+      });
+
+      if(filtered.length === 0){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td'); td.colSpan = 4; td.className = 'small-muted'; td.textContent = 'No orders for selected range.';
+        tr.appendChild(td);
+        ordersTbody.appendChild(tr);
+      }
+    }
+
+    // chart builder (smaller view)
+    function buildChart(filtered){
+      const counts = {};
+      filtered.forEach(o => {
+        const day = new Date(o.createdAt||parseOrderCreated(o)).toISOString().slice(0,10);
+        counts[day] = (counts[day] || 0) + 1;
+      });
+      const labels = Object.keys(counts).sort();
+      const data = labels.map(l => counts[l] || 0);
+
+      if(!chart){
+        chart = new Chart(ordersChartCanvas.getContext('2d'), {
+          type: chartMode,
+          data: { labels, datasets: [{ label: 'Orders', data, backgroundColor: 'rgba(66,165,245,0.35)', borderColor: 'rgba(66,165,245,0.9)', borderWidth: 1 }] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { ticks: { color: '#cfefff' } },
+              y: { beginAtZero: true, ticks: { color: '#cfefff' } }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+      } else {
+        chart.config.type = chartMode;
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.update();
+      }
+    }
+
+    // refresh UI
+    function refreshUI(){
+      const filtered = getFilteredOrders();
+      const agg = computeKPIs(filtered);
+      kTotal.textContent = agg.totalOrders;
+      kSales.textContent = '€' + agg.sales.toFixed(2);
+      kCompleted.textContent = agg.completed;
+      kPending.textContent = agg.pending;
+      kPayments.textContent = `Cash:${agg.payments.cash} Card:${agg.payments.card} Wolt:${agg.payments.wolt} Online:${agg.payments.online}`;
+      kAvg.textContent = '€' + agg.avg.toFixed(2);
+
+      renderOrdersList(filtered);
+      buildChart(filtered);
+    }
+
+    // modal: open by order id
+    function openOrderModal(orderId){
+      const order = Object.values(ordersCache).find(o => String(o.id) === String(orderId));
+      if(!order) return alert('Order not found');
+      currentModalOrder = order;
+      modalTitle.textContent = 'Order #' + (order.id || '');
+      modalMeta.textContent = `Table: ${order.table || '—'}  •  Total: €${(Number(order.total)||0).toFixed(2)}  •  Created: ${new Date(order.createdAt||parseOrderCreated(order)).toLocaleString()}`;
+      // items
+      modalItemsBody.innerHTML = '';
+      const items = Array.isArray(order.items) ? order.items : [];
+      items.forEach(it => {
+        const tr = document.createElement('tr');
+        const nameTd = document.createElement('td'); nameTd.textContent = it.name || '';
+        const qtyTd = document.createElement('td'); qtyTd.textContent = it.qty || (it.qty===0?0:1);
+        const priceTd = document.createElement('td'); priceTd.textContent = '€' + ((Number(it.price)||0) * (it.qty||1)).toFixed(2);
+        tr.appendChild(nameTd); tr.appendChild(qtyTd); tr.appendChild(priceTd);
+        modalItemsBody.appendChild(tr);
+      });
+
+      modalPayment.textContent = order.paymentType || order.payment || '—';
+      modalStatus.textContent = order.status || 'pending';
+      const scheduledMs = parseScheduledMs(order);
+      if(scheduledMs && scheduledMs > Date.now()){
+        const sec = Math.ceil((scheduledMs - Date.now())/1000);
+        modalSched.textContent = formatHMS(sec) + ' left';
+        if(sec <= 30*60) modalSched.style.color = 'var(--danger)'; else modalSched.style.color = '';
+      } else if(scheduledMs){
+        modalSched.textContent = new Date(scheduledMs).toLocaleString();
+        modalSched.style.color = '';
+      } else {
+        modalSched.textContent = '—';
+        modalSched.style.color = '';
+      }
+
+      modalOpenBtn.onclick = () => window.open('order.html?order=' + encodeURIComponent(order.id), '_blank');
+      modalMarkDone.onclick = () => {
+        if(!confirm('Mark this order as completed?')) return;
+        firebase.database().ref('orders/' + order.id).update({ status: 'completed', completedAt: Date.now(), updatedAt: Date.now() })
+          .then(()=> { alert('Order marked completed'); closeModal(); })
+          .catch(err => alert('Error: ' + err.message));
+      };
+      modalPrint.onclick = () => window.print();
+
+      orderModal.classList.add('show');
+    }
+
+    function closeModal(){ currentModalOrder = null; orderModal.classList.remove('show'); }
+    modalCloseBtn.addEventListener('click', closeModal);
+    orderModal.addEventListener('click', (e) => { if(e.target === orderModal) closeModal(); });
+
+    // export filtered CSV
+    exportFilteredCsv.addEventListener('click', ()=> {
+      const filtered = getFilteredOrders();
+      if(filtered.length === 0) return alert('No orders to export');
+      const rows = filtered.map(o => ({
+        id: o.id || '',
+        table: o.table || '',
+        createdAt: new Date(o.createdAt || parseOrderCreated(o)).toLocaleString(),
+        total: (Number(o.total)||0).toFixed(2),
+        status: o.status || '',
+        payment: o.paymentType || o.payment || '',
+        scheduled: o.scheduledTime || ''
+      }));
+      exportCsv(rows, 'orders_filtered.csv');
+    });
+
+    // export all
+    exportCsvBtn.addEventListener('click', ()=> {
+      const all = Object.values(ordersCache);
+      if(all.length === 0) return alert('No orders to export');
+      const rows = all.map(o => ({
+        id: o.id||'', table: o.table||'', createdAt: new Date(o.createdAt||parseOrderCreated(o)).toLocaleString(),
+        total: (Number(o.total)||0).toFixed(2), status: o.status||'', payment: o.paymentType||o.payment||'', scheduled: o.scheduledTime || ''
+      }));
+      exportCsv(rows, 'orders_all.csv');
+    });
+
+    function exportCsv(rows, filename='orders.csv'){
+      if(!rows || rows.length === 0) return alert('No rows');
+      const headers = Object.keys(rows[0]);
+      const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => {
+        const v = r[h] == null ? '' : String(r[h]).replace(/"/g,'""'); return `"${v}"`;
+      }).join(','))).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    // UI events
+    applyFilter.addEventListener('click', refreshUI);
+    clearFilter.addEventListener('click', ()=> { presetRange.value='today'; startDateEl.value=''; endDateEl.value=''; searchInput.value=''; refreshUI(); });
+    toggleChart.addEventListener('click', ()=> { chartMode = chartMode === 'bar' ? 'line' : 'bar'; if(chart){ chart.config.type = chartMode; chart.update(); } });
+    showAllBtn.addEventListener('click', ()=> { startDateEl.value=''; endDateEl.value=''; presetRange.value='all'; searchInput.value=''; refreshUI(); });
+    refreshBtn.addEventListener('click', ()=> { ordersRef.once('value').then(snap => { const val = snap.val() || {}; ordersCache = {}; Object.keys(val).forEach(k => { const o = val[k]; o.id = o.id || k; if(!o.createdAt) o.createdAt = parseOrderCreated(o); ordersCache[k] = o; }); refreshUI(); }); });
+
+    // realtime listener
+    ordersRef.on('value', snap => {
+      const val = snap.val() || {};
+      ordersCache = {};
+      Object.keys(val).forEach(k => {
+        const o = val[k];
+        o.id = o.id || k;
+        if(!o.createdAt) o.createdAt = parseOrderCreated(o);
+        ordersCache[k] = o;
+      });
+      refreshUI();
+    }, err => {
+      console.error('Firebase error', err);
+      ordersRef.once('value').then(snap => { const val = snap.val() || {}; ordersCache = {}; Object.keys(val).forEach(k => { const o = val[k]; o.id = o.id || k; if(!o.createdAt) o.createdAt = parseOrderCreated(o); ordersCache[k] = o; }); refreshUI(); }).catch(()=>{});
+    });
+
+    // init
+    (function init(){
+      presetRange.value = 'today';
+      refreshUI();
+      buildChart([]);
+    })();
+  </script>
+</body>
+</html>

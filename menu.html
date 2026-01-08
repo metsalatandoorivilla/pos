@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Menu - RAVINTOLA TANDOORI VILLA</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+  <style>
+    :root{
+      --bg:#0d0d0d;
+      --card:#181818;
+      --accent:#1a73e8;
+      --muted:#90caf9;
+      --border:#333;
+      --accent-grad: linear-gradient(90deg,#233dff 0%,#1a237e 100%);
+      --glass: rgba(255,255,255,0.03);
+      --radius:10px;
+      --text:#fff;
+    }
+
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:"Helvetica Neue", Arial, sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+
+    /* fixed hamburger (always visible) */
+    .hamburger {
+      position: fixed;
+      left: 12px;
+      top: 12px;
+      width:46px;
+      height:46px;
+      border-radius:10px;
+      background: var(--card);
+      border:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:99999;
+      cursor:pointer;
+      box-shadow: 0 6px 22px rgba(0,0,0,0.6);
+      transition: transform .14s ease, background .12s;
+    }
+    .hamburger:active { transform: translateY(1px); }
+
+    /* sidebar (drawer) */
+    .sidebar {
+      position: fixed;
+      left: -296px;            /* hidden by default */
+      top: 0;
+      bottom: 0;
+      width: 288px;
+      background: linear-gradient(180deg, rgba(24,24,24,0.98), rgba(16,16,16,0.98));
+      border-right: 1px solid var(--border);
+      padding: 18px 14px;
+      box-sizing: border-box;
+      z-index: 99998;
+      transition: left .28s cubic-bezier(.2,.9,.2,1);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .sidebar.open { left: 8px; } /* slide in */
+
+    .sidebar-header { display:flex; align-items:center; gap:10px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.03); }
+    .brand-dot { width:44px; height:44px; border-radius:8px; background: var(--accent-grad); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; box-shadow: 0 6px 20px rgba(26,115,232,0.08); }
+    .brand-title { font-weight:800; font-size:1rem; color:var(--accent); letter-spacing:0.6px; }
+    .sidebar .note { font-size:12px; color:var(--muted); margin-top:6px; }
+
+    .menu-list { margin-top: 10px; display:flex; flex-direction:column; gap:8px; overflow:auto; padding-bottom:12px; }
+    .menu-item {
+      display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:8px; cursor:pointer; color:var(--text);
+      background: transparent; border:1px solid transparent; transition: background .12s, transform .08s, border .12s;
+      user-select:none;
+    }
+    .menu-item:hover { background: var(--glass); }
+    .menu-item.active { background: var(--accent-grad); box-shadow: 0 6px 20px rgba(26,115,232,0.12); color:#fff; }
+    .menu-item .ico { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; color:#fff; background: rgba(255,255,255,0.05); }
+    .menu-item .label { font-weight:700; font-size:15px; }
+    .menu-item .sub { margin-left:auto; font-size:12px; color: rgba(255,255,255,0.65); }
+
+    /* iframe area (content) */
+    .frame-wrap {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 1;
+    }
+    /* ensure hamburger and sidebar sit above iframe */
+    .frame {
+      position: absolute;
+      inset: 0;
+      border: none;
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+
+    /* loader overlay while iframe loads */
+    .loader {
+      position: fixed;
+      left: 0; right: 0; top: 0; bottom: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 99997;
+      pointer-events: none;
+    }
+    .loader.show { display:flex; pointer-events: none; }
+    .spinner {
+      width:72px; height:72px; border-radius:12px; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.04);
+      box-shadow: 0 8px 36px rgba(0,0,0,0.6);
+    }
+    .spinner i { font-size:26px; color:var(--accent); animation: spin 1s linear infinite; }
+    @keyframes spin { from{ transform: rotate(0deg);} to{ transform: rotate(360deg);} }
+
+    /* helper content box shown before iframe loads (visible under overlay) */
+    .content {
+      position: absolute;
+      inset: 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+      z-index: 0;
+    }
+    .content .box {
+      background: rgba(255,255,255,0.02);
+      padding:20px 22px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.03);
+      backdrop-filter: blur(4px);
+      max-width:760px;
+      text-align:center;
+    }
+    .content h1 { margin:0 0 8px 0; font-size:20px; color:var(--muted); }
+    .content p { margin:0; color:rgba(255,255,255,0.75); font-size:14px; }
+
+    /* keep hamburger visible when sidebar open; transform handled for subtle shift */
+    .sidebar.open ~ .hamburger { transform: translateX(280px); margin-left: -280px; }
+
+    /* small screens tweaks (no layout change, just touch sizes) */
+    @media (max-width:720px){
+      .hamburger { left: 8px; top:8px; width:44px; height:44px; }
+      .sidebar { width: 280px; }
+      .sidebar.open { left: 8px; }
+      .menu-item { padding:12px; }
+      .spinner { width:64px; height:64px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar / Drawer -->
+  <nav id="sidebar" class="sidebar" aria-hidden="true" role="navigation" aria-label="Main menu">
+    <div class="sidebar-header">
+      <div><br>
+      <br>
+      <br>
+        <div class="brand-title">RAVINTOLA TANDOORI VILLA</div>
+        <div class="note"></div>
+      </div>
+    </div>
+
+    <div class="menu-list" role="menu" aria-label="Application links">
+      <div class="menu-item" data-key="reservations" role="menuitem" tabindex="0" title="Reservations">
+        <div class="ico"><i class="fa fa-list"></i></div>
+        <div class="label">Reservations</div>
+      </div>
+
+      <div class="menu-item" data-key="pos" role="menuitem" tabindex="0" title="POS">
+        <div class="ico"><i class="fa fa-cash-register"></i></div>
+        <div class="label">POS</div>
+      </div>
+
+      <div class="menu-item" data-key="kitchen" role="menuitem" tabindex="0" title="Kitchen Screen">
+        <div class="ico"><i class="fa fa-utensils"></i></div>
+        <div class="label">Kitchen Screen</div>
+      </div>
+
+      <!-- Completed Orders added as a top-level item between Kitchen and Delivery -->
+      <div class="menu-item" data-key="completedorders" role="menuitem" tabindex="0" title="Completed Orders">
+        <div class="ico"><i class="fa fa-check-circle"></i></div>
+        <div class="label">Completed Orders</div>
+      </div>
+
+      <div class="menu-item" data-key="delivery" role="menuitem" tabindex="0" title="Delivery Log">
+        <div class="ico"><i class="fa fa-truck"></i></div>
+        <div class="label">Delivery Log</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Fixed hamburger icon (always present) -->
+  <button id="hambtn" class="hamburger" aria-expanded="false" aria-controls="sidebar" aria-label="Open menu">
+    <i id="hambIcon" class="fa fa-bars" style="color:var(--text);font-size:18px;"></i>
+  </button>
+
+  <!-- iframe content area: the selected page will load inside this iframe so hamburger/sidebar remain -->
+  <div class="frame-wrap" role="main" aria-live="polite">
+    <iframe id="appFrame" class="frame" src="about:blank" title="App content"></iframe>
+
+    <!-- loader overlay shown while iframe loads -->
+    <div id="loader" class="loader" aria-hidden="true">
+      <div class="spinner"><i class="fa fa-sync-alt"></i></div>
+    </div>
+
+    <!-- helpful placeholder (appears under iframe while nothing loaded) -->
+    <div class="content" aria-hidden="false">
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const sidebar = document.getElementById('sidebar');
+      const hambtn = document.getElementById('hambtn');
+      const appFrame = document.getElementById('appFrame');
+      const loader = document.getElementById('loader');
+      const menuItems = Array.from(document.querySelectorAll('.menu-item'));
+
+      // mapping keys to target URLs
+      const targets = {
+        reservations: 'https://davidbantu.github.io/newreservations/index.html',
+        pos: 'https://davidbantu.github.io/david/',
+        kitchen: 'https://davidbantu.github.io/david/home.html',
+        delivery: 'https://tandoorivilla.github.io/delivery/login.html',
+        completedorders: 'https://davidbantu.github.io/david/completedorders'
+      };
+
+      // default selection = reservations
+      let activeKey = 'reservations';
+
+      function setActiveKey(key){
+        activeKey = key;
+        menuItems.forEach(it=>{
+          it.classList.toggle('active', it.dataset.key === key);
+        });
+      }
+
+      // initially highlight default
+      setActiveKey(activeKey);
+
+      // functions for sidebar open/close
+      function openSidebar(){
+        sidebar.classList.add('open');
+        sidebar.setAttribute('aria-hidden','false');
+        hambtn.setAttribute('aria-expanded','true');
+      }
+      function closeSidebar(){
+        sidebar.classList.remove('open');
+        sidebar.setAttribute('aria-hidden','true');
+        hambtn.setAttribute('aria-expanded','false');
+      }
+      function toggleSidebar(){ sidebar.classList.contains('open') ? closeSidebar() : openSidebar(); }
+
+      // hamburger toggles sidebar; never removed/disabled
+      hambtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        toggleSidebar();
+      });
+
+      // close sidebar when clicking outside it (but hamburger remains)
+      document.addEventListener('click', function(e){
+        if(!sidebar.contains(e.target) && !hambtn.contains(e.target)){
+          closeSidebar();
+        }
+      });
+
+      // keyboard accessibility
+      document.addEventListener('keydown', function(e){
+        if(e.key === 'Escape') closeSidebar();
+      });
+
+      // show loader when iframe is loading
+      function showLoader(){
+        loader.classList.add('show');
+        loader.setAttribute('aria-hidden','false');
+      }
+      function hideLoader(){
+        loader.classList.remove('show');
+        loader.setAttribute('aria-hidden','true');
+      }
+
+      // load url into iframe (keeps page context so hamburger remains)
+      function loadInFrame(key){
+        const url = targets[key];
+        if(!url) return;
+        setActiveKey(key);
+        // show loader before navigating
+        showLoader();
+        // set iframe src (this won't navigate top window)
+        appFrame.src = url;
+        // close sidebar for cleaner view (hamburger stays)
+        closeSidebar();
+      }
+
+      // attach menu item click handlers
+      menuItems.forEach(it=>{
+        it.addEventListener('click', function(e){
+          const key = this.dataset.key;
+          loadInFrame(key);
+        });
+        it.addEventListener('keydown', function(e){
+          if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
+        });
+      });
+
+      // iframe onload - hide loader
+      appFrame.addEventListener('load', function(){
+        // small delay to allow page to stabilize
+        setTimeout(hideLoader, 220);
+      });
+
+      // If the iframe fails to load (e.g., X-Frame-Options), still hide loader after timeout and open in new tab fallback
+      appFrame.addEventListener('error', function(){
+        setTimeout(()=> {
+          hideLoader();
+          // fallback: open target in new tab
+          const url = targets[activeKey];
+          if(url) window.open(url, '_blank');
+        }, 600);
+      });
+
+      // default behaviour: load reservations into iframe on initial load
+      loadInFrame('reservations');
+
+      // expose for debugging (optional)
+      window.__menu = { openSidebar, closeSidebar, loadInFrame, setActiveKey };
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Completed Orders — Kitchen Screen</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Montserrat:wght@700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+  <style>
+    :root{
+      --main-bg: linear-gradient(to bottom right, #0d47a1, #000000);
+      --card-bg: #181c24;
+      --accent: #bbdefb;
+      --primary: #42a5f5;
+      --muted: #9aa8c0;
+      --white: #fff;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:"Poppins",sans-serif;color:#fff;background:var(--main-bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    .wrap{max-width:1200px;margin:0 auto;padding:14px;min-height:100vh;display:flex;flex-direction:column;gap:12px}
+    .topbar{display:flex;align-items:center;gap:12px}
+    .title{font-weight:900;color:var(--accent);font-size:1.25rem}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .btn{background:var(--primary);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px}
+    .order-card{background:var(--card-bg);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:10px}
+    .order-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+    .left{display:flex;flex-direction:column;gap:6px}
+    .table-num{background:var(--primary);padding:6px 10px;border-radius:8px;font-weight:900;display:inline-block}
+    .small-muted{color:var(--muted)}
+    .items{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;display:flex;flex-direction:column;gap:8px}
+    .item-row{display:flex;justify-content:space-between;align-items:center}
+    .qty{font-weight:900;background:#222;padding:6px 8px;border-radius:6px}
+    .print-row{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+    .completed-time{font-weight:800;color:var(--muted)}
+    @media print {
+      body *{visibility:hidden!important}
+      #printArea, #printArea *{visibility:visible!important;background:#fff!important;color:#000!important}
+      #printArea{position:absolute;left:0;top:0;width:72mm;max-width:80mm;min-width:56mm;font-family:'Montserrat',Arial,sans-serif;padding:10px 8px}
+      #printArea .tbl-highlight{display:flex;justify-content:center;gap:8px;padding:6px 8px;border:2px solid #000}
+      #printArea .tbl-num{background:#000;color:#fff;padding:6px 10px;border-radius:6px;font-weight:900}
+      #printArea .big-schedule{text-align:center;font-size:28px;font-weight:900;margin-top:10px}
+      #printArea .order-items-table{width:100%;border-collapse:collapse;margin-top:8px}
+      #printArea .order-items-table th,#printArea .order-items-table td{border:1.2px solid #333;padding:8px;font-size:14px}
+      #printArea .big-qty{font-size:30px;font-weight:900;text-align:center}
+      #printArea .total-row{text-align:right;font-weight:900;margin-top:8px;font-size:20px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title"><i class="fas fa-check-circle"></i> Completed Orders</div>
+      <div class="controls">
+        <div id="todayLabel" class="small-muted"></div>
+        <button id="refreshBtn" class="btn" title="Refresh list"><i class="fas fa-sync"></i> Refresh</button>
+      </div>
+    </div>
+
+    <div id="summary" style="display:flex;gap:12px;align-items:center">
+      <div class="small-muted">Completed today:</div>
+      <div id="completedCount" style="font-weight:900">0</div>
+    </div>
+
+    <div id="ordersGrid" class="grid" aria-live="polite"></div>
+    <div id="emptyState" class="small-muted" style="display:none;margin-top:12px">No completed orders for today.</div>
+  </div>
+
+  <div id="printArea" style="display:none"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script>
+    // Firebase config (same as your other pages)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZCm8Fmp-zNlb2D20gqLCyifky-hGtZvI",
+      authDomain: "newpos-dacb5.firebaseapp.com",
+      databaseURL: "https://newpos-dacb5-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "newpos-dacb5",
+      storageBucket: "newpos-dacb5.appspot.com",
+      messagingSenderId: "667100253940",
+      appId: "1:667100253940:web:cfd8f0b9b51b6e697818a1",
+      measurementId: "G-F5Q2JCNJ10"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const ordersGrid = document.getElementById('ordersGrid');
+    const emptyState = document.getElementById('emptyState');
+    const completedCountEl = document.getElementById('completedCount');
+    const todayLabel = document.getElementById('todayLabel');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const printArea = document.getElementById('printArea');
+
+    function todayDateStr(){ return (new Date()).toISOString().slice(0,10); }
+    function pad(n){ return String(n).padStart(2,'0'); }
+
+    function statusIsCompleted(s){
+      if(!s) return false;
+      return String(s).toLowerCase() === 'completed';
+    }
+
+    function formatTimeAMPM(ms){
+      try {
+        const d = new Date(ms);
+        if(isNaN(d.getTime())) return '';
+        let hours = d.getHours();
+        const minutes = d.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        return hours + ':' + pad(minutes) + ' ' + ampm;
+      } catch(e){ return ''; }
+    }
+
+    function parseScheduledMs(order){
+      const st = order && order.scheduledTime;
+      if(!st) return null;
+      if(typeof st === 'number') return st;
+      try {
+        const s = String(st).trim();
+        if(/\d{4}-\d{2}-\d{2}T/.test(s)){
+          const d = new Date(s); if(!isNaN(d.getTime())) return d.getTime();
+        }
+        if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){
+          const datePart = order.scheduledDate || order.date || todayDateStr();
+          const timePart = s.length <= 5 ? s + ':00' : s;
+          const d = new Date(datePart + 'T' + timePart); if(!isNaN(d.getTime())) return d.getTime();
+        }
+        const dp = Date.parse(s); if(!isNaN(dp)) return dp;
+      } catch(e){}
+      return null;
+    }
+
+    // Print helper (uses your logo)
+    function printOrderReceipt(id, order, options = { aggregate: false }){
+      const area = printArea;
+      area.innerHTML = '';
+
+      let html = '';
+      // user logo (replaced per your request)
+      html += `<div style="text-align:center;margin-bottom:6px;"><img src="https://raw.githubusercontent.com/Davidbantu/david/refs/heads/main/logo_header.png" alt="logo" style="max-width:160px; display:inline-block;"></div>`;
+
+      const tbl = order.table ? String(order.table).toUpperCase() : (id || '');
+      html += `<div class="tbl-highlight" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0;"><span class="tbl-num" style="background:#000;color:#fff;padding:6px 10px;border-radius:6px">${tbl}</span></div>`;
+
+      html += `<div class="order-info-row"><span style="font-weight:900">Order #:</span> <span>${id}</span></div>`;
+      html += `<div class="order-info-row"><span style="font-weight:900">Date:</span> <span>${order.date || ''} ${(order.time||'')}</span></div>`;
+
+      if(order.note && String(order.note).trim()){
+        html += `<div style="font-weight:900;margin-top:6px;text-transform:uppercase">${String(order.note).toUpperCase()}</div>`;
+      }
+
+      // Decide items to print
+      let itemsToPrint = [];
+      if(options.aggregate){
+        const items = Array.isArray(order.items) ? order.items.slice() : [];
+        const map = {};
+        for(const it of items){
+          const name = (it.name || '').trim();
+          if(!name) continue;
+          const key = name.toLowerCase() + '||' + (Number(it.price || 0).toFixed(2));
+          if(!map[key]) map[key] = { name: name, qty: 0, price: Number(it.price || 0), notes: [] };
+          map[key].qty += Number(it.qty || 1);
+          if(it.note && String(it.note).trim()) map[key].notes.push(it.note.trim());
+        }
+        itemsToPrint = Object.keys(map).map(k => ({ name: map[k].name, qty: map[k].qty, price: map[k].price, notes: Array.from(new Set(map[k].notes)).join(' / ') }));
+      } else {
+        itemsToPrint = (Array.isArray(order.items) ? order.items : []).map(it => ({ name: it.name||'', qty: it.qty||1, price: Number(it.price||0), notes: it.note||'' }));
+      }
+
+      html += `<table class="order-items-table" style="width:100%;border-collapse:collapse;margin-top:8px;"><thead>
+        <tr>
+          <th style="width:18%;text-align:center;font-weight:900;">QTY</th>
+          <th style="width:62%;font-weight:900;">ITEM</th>
+          <th style="width:20%;text-align:right;font-weight:900;">TOTAL</th>
+        </tr>
+      </thead><tbody>`;
+
+      if(itemsToPrint.length === 0){
+        html += `<tr><td colspan="3" style="text-align:center">No items</td></tr>`;
+      } else {
+        for(const it of itemsToPrint){
+          const totalForRow = (Number(it.price || 0) * Number(it.qty || 1)).toFixed(2);
+          html += `<tr>
+            <td class="big-qty" style="vertical-align:middle;text-align:center;font-weight:900;font-size:28px;">${String(it.qty || 1).toUpperCase()}</td>
+            <td style="vertical-align:middle;">
+              <div style="font-weight:900;font-size:15px;">${String(it.name || '').toUpperCase()}</div>
+              <div style="font-weight:700;font-size:12px;">€${Number(it.price || 0).toFixed(2)}</div>
+              ${it.notes ? `<div style="font-style:italic;font-size:12px;margin-top:4px;">${String(it.notes).toUpperCase()}</div>` : ''}
+            </td>
+            <td style="vertical-align:middle;text-align:right;font-weight:900;">€${totalForRow}</td>
+          </tr>`;
+        }
+      }
+
+      html += `</tbody></table>`;
+      html += `<div class="total-row" style="font-weight:900;font-size:20px;padding-top:8px;text-align:right;">Total: €${Number(order.total || 0).toFixed(2)}</div>`;
+
+      // scheduled time (big AM/PM if available)
+      const scheduledMs = parseScheduledMs(order);
+      if(scheduledMs){
+        const formatted = formatTimeAMPM(scheduledMs);
+        if(formatted) html += `<div class="big-schedule" style="text-align:center;font-size:28px;font-weight:900;margin-top:10px">${formatted}</div>`;
+      }
+
+      html += `<div style="text-align:center;margin-top:12px;font-size:11px;border-top:1px dashed #000;padding-top:6px">--- END OF ORDER ---</div>`;
+
+      area.innerHTML = html;
+      area.style.display = 'block';
+      setTimeout(()=>{ window.print(); setTimeout(()=>{ area.style.display='none'; area.innerHTML=''; },250); }, 10);
+    }
+
+    // Build a small card showing completed order details
+    function buildCompletedCard(id, orderData){
+      const card = document.createElement('div');
+      card.className = 'order-card';
+      card.dataset.id = id;
+
+      const head = document.createElement('div'); head.className = 'order-head';
+      const left = document.createElement('div'); left.className = 'left';
+      const tableNum = document.createElement('div'); tableNum.className = 'table-num'; tableNum.textContent = (orderData.table || id || '').toString().toUpperCase();
+      const info = document.createElement('div'); info.innerHTML = `<div style="font-weight:800">Order #${id}</div><div class="small-muted">${orderData.date || ''} ${orderData.time || ''}</div>`;
+      left.appendChild(tableNum); left.appendChild(info);
+
+      const right = document.createElement('div'); right.style.textAlign='right';
+      const completedAt = orderData.completedAt || orderData.updatedAt || null;
+      const completedText = document.createElement('div'); completedText.className = 'completed-time';
+      if(completedAt) {
+        const d = new Date(Number(completedAt));
+        completedText.textContent = 'Completed: ' + d.toLocaleString();
+      } else {
+        completedText.textContent = 'Completed';
+      }
+      right.appendChild(completedText);
+
+      head.appendChild(left); head.appendChild(right);
+      card.appendChild(head);
+
+      if(orderData.note) {
+        const note = document.createElement('div'); note.className = 'small-muted'; note.style.marginTop='6px'; note.textContent = orderData.note;
+        card.appendChild(note);
+      }
+
+      // Items
+      const itemsWrap = document.createElement('div'); itemsWrap.className = 'items';
+      const items = Array.isArray(orderData.items) ? orderData.items : [];
+      if(items.length === 0){
+        const none = document.createElement('div'); none.className='small-muted'; none.textContent = 'No items';
+        itemsWrap.appendChild(none);
+      } else {
+        items.forEach(it => {
+          const row = document.createElement('div'); row.className='item-row';
+          const leftPart = document.createElement('div'); leftPart.style.display='flex'; leftPart.style.flexDirection='column';
+          const name = document.createElement('div'); name.style.fontWeight='800'; name.textContent = (it.name || '').toString().toUpperCase();
+          const notes = document.createElement('div'); notes.className='small-muted'; notes.style.fontSize='12px'; notes.textContent = it.note || '';
+          leftPart.appendChild(name); if(it.note) leftPart.appendChild(notes);
+          const rightPart = document.createElement('div'); rightPart.style.display='flex'; rightPart.style.alignItems='center'; rightPart.style.gap='8px';
+          const qty = document.createElement('div'); qty.className='qty'; qty.textContent = 'x' + (it.qty || 1);
+          const price = document.createElement('div'); price.style.fontWeight='700'; price.textContent = '€' + (Number(it.price || 0) * (it.qty || 1)).toFixed(2);
+          rightPart.appendChild(qty); rightPart.appendChild(price);
+          row.appendChild(leftPart); row.appendChild(rightPart);
+          itemsWrap.appendChild(row);
+        });
+      }
+      card.appendChild(itemsWrap);
+
+      const footer = document.createElement('div'); footer.style.display='flex'; footer.style.justifyContent='space-between'; footer.style.alignItems='center'; footer.style.marginTop='8px';
+      const total = document.createElement('div'); total.style.fontWeight='900'; total.textContent = 'Total: €' + Number(orderData.total || 0).toFixed(2);
+      footer.appendChild(total);
+
+      const printRow = document.createElement('div'); printRow.className='print-row';
+      const printBtn = document.createElement('button'); printBtn.className='btn'; printBtn.innerHTML = '<i class="fas fa-print"></i> Print';
+      printBtn.addEventListener('click', ()=> printOrderReceipt(id, orderData, { aggregate: false }));
+      printRow.appendChild(printBtn);
+
+      footer.appendChild(printRow);
+      card.appendChild(footer);
+
+      return card;
+    }
+
+    // Real-time listener: watch orders and render completed ones for today
+    let ordersRef = null;
+    function attachCompletedListener(){
+      const today = todayDateStr();
+      todayLabel.textContent = today;
+
+      // subscribe to /orders and filter locally for completed + today's date
+      if(ordersRef) ordersRef.off();
+      ordersRef = firebase.database().ref('orders');
+      ordersRef.on('value', snap => {
+        const val = snap.val() || {};
+        const entries = Object.keys(val).map(k => ({ id: k, data: val[k] }));
+
+        const completedToday = entries.filter(e => {
+          const o = e.data || {};
+          const dateMatches = (o.date || '') === today;
+          return statusIsCompleted(o.status) && dateMatches;
+        }).sort((a,b) => {
+          const ta = Number(a.data.completedAt || a.data.updatedAt || 0);
+          const tb = Number(b.data.completedAt || b.data.updatedAt || 0);
+          return tb - ta; // newest first
+        });
+
+        ordersGrid.innerHTML = '';
+        if(completedToday.length === 0){
+          emptyState.style.display = 'block';
+        } else {
+          emptyState.style.display = 'none';
+          completedToday.forEach(e => {
+            const card = buildCompletedCard(e.id, e.data);
+            ordersGrid.appendChild(card);
+          });
+        }
+        completedCountEl.textContent = completedToday.length;
+      }, err => {
+        console.error('Firebase listener error', err);
+      });
+    }
+
+    // manual refresh fallback
+    refreshBtn.addEventListener('click', () => {
+      attachCompletedListener();
+    });
+
+    // start listener
+    attachCompletedListener();
+
+    // cleanup on unload
+    window.addEventListener('beforeunload', () => {
+      if(ordersRef) ordersRef.off();
+    });
+  </script>
+</body>
+</html>

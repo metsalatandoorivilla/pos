@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Menu Editor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600,700&display=swap" rel="stylesheet" />
+  <style>
+    body { margin:0; font-family:Poppins, sans-serif; background:#0b1220; color:#eaf4ff; padding:18px; }
+    .wrap { max-width:1100px; margin:0 auto; display:block; gap:18px; }
+    .panel { background:#121523; border-radius:10px; padding:12px; border:1px solid #253246; }
+    h2 { margin:0 0 8px 0; color:#bbdefb; font-size:1.05rem; }
+    .category { border:1px solid #223246; padding:8px; border-radius:8px; margin-bottom:8px; background:#0f1720; display:flex; gap:10px; align-items:flex-start; }
+    .cat-left { flex:1; }
+    .cat-actions { display:flex; gap:8px; align-items:center; }
+    .item { background:#0b1320; padding:6px; border-radius:6px; display:flex; justify-content:space-between; gap:8px; margin-bottom:6px; border:1px solid #1b2936; }
+    .btn { background:#1976d2; color:#fff; border:0; padding:6px 8px; border-radius:6px; cursor:pointer; font-weight:700; }
+    .ghost { background:#223246; color:#bbdefb; border:0; padding:6px 8px; border-radius:6px; cursor:pointer; }
+    input[type="text"], input[type="number"] { background:#071021; border:1px solid #1b2936; color:#eaf4ff; padding:6px 8px; border-radius:6px; }
+    .small { font-size:0.9rem; padding:4px 6px; }
+    .muted { color:#8ea7bf; font-size:0.9rem; }
+    .header { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+    .actions-row { display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap; }
+    .footer-note { margin-top:12px; color:#9fb7cf; font-size:0.92rem; }
+    a.inline-link { color:#bbdefb; text-decoration:none; background:transparent; padding:6px 8px; border-radius:6px; border:1px solid transparent; }
+
+    /* Drag visuals */
+    .dragging { opacity: 0.45; }
+    .drag-over { outline: 2px dashed #42a5f5; border-radius:6px; }
+    .item.drag-over { outline: 2px dashed #42a5f5; }
+
+    .hint { margin-top:8px; color:#9fb7cf; font-size:0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel" id="editorPanel">
+      <div class="header">
+        <h2>Menu Editor</h2>
+        <div class="muted">Drag categories or items to reorder; items can be moved between categories. Changes save to Firebase /menu</div>
+      </div>
+
+      <div class="actions-row">
+        <input id="newCategoryInput" placeholder="New category name" type="text" />
+        <button id="addCategoryBtn" class="btn small">Add Category</button>
+        <button id="refreshBtn" class="ghost small">Refresh</button>
+        <button id="exportBtn" class="ghost small">Export JSON</button>
+        <button id="importBtn" class="btn small">Import JSON</button>
+        <input id="importArea" type="file" accept="application/json" style="display:none;" />
+      </div>
+
+      <div id="categoriesList"></div>
+
+      <div class="footer-note">
+        Tip: open order.html in another tab to see live updates. Drag a category to reorder categories. Drag an item to reorder within its category or drop into another category to move it there.
+        <div style="margin-top:8px;"><a class="inline-link" href="order.html" target="_blank">Open Order page</a></div>
+      </div>
+      <div class="hint">When dragging items, dropping on an item inserts before/after depending where you release; dropping on category appends at end.</div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script>
+    // Firebase same config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZCm8Fmp-zNlb2D20gqLCyifky-hGtZvI",
+      authDomain: "newpos-dacb5.firebaseapp.com",
+      databaseURL: "https://newpos-dacb5-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "newpos-dacb5",
+      storageBucket: "newpos-dacb5.appspot.com",
+      messagingSenderId: "667100253940",
+      appId: "1:667100253940:web:cfd8f0b9b51b6e697818a1",
+      measurementId: "G-F5Q2JCNJ10"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const defaultMenu = [
+      { category: "Starters", items:[{name:"Tomato Shorba",price:5},{name:"Paneer Tikka",price:8}]},
+      { category: "Curries", items:[{name:"Butter Chicken",price:16},{name:"Paneer Butter Masala",price:15}]}
+    ];
+
+    const menuRef = firebase.database().ref('menu');
+    let menu = [];
+
+    // UI refs
+    const categoriesList = document.getElementById('categoriesList');
+    const newCategoryInput = document.getElementById('newCategoryInput');
+    const addCategoryBtn = document.getElementById('addCategoryBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importArea = document.getElementById('importArea');
+
+    // Drag state (keeps track of source)
+    let dragState = { type: null, fromCat: null, fromIndex: null, fromCategoryDragIndex: null };
+
+    function writeMenuToFirebase(){
+      if(!Array.isArray(menu)) return alert('Menu invalid');
+      menuRef.set(menu).catch(err => alert('Error saving menu: ' + (err.message || err)));
+    }
+
+    // Load realtime
+    menuRef.on('value', snap => {
+      const val = snap.val();
+      if(!val){ menu = defaultMenu.slice(); }
+      else {
+        if(Array.isArray(val)) menu = val;
+        else {
+          const keys = Object.keys(val || {});
+          const isNumericKeys = keys.length && keys.every(k => /^\d+$/.test(k));
+          if(isNumericKeys) menu = keys.sort((a,b)=>Number(a)-Number(b)).map(k=>val[k]);
+          else if(val.menu && Array.isArray(val.menu)) menu = val.menu;
+          else menu = Array.isArray(val) ? val : Object.values(val);
+        }
+      }
+      renderCategories();
+    });
+
+    // Rendering + drag handlers
+    function renderCategories(){
+      categoriesList.innerHTML = '';
+      menu.forEach((cat, cIdx) => {
+        const catEl = document.createElement('div');
+        catEl.className = 'category';
+        catEl.dataset.catIndex = cIdx;
+        catEl.setAttribute('draggable','true');
+
+        // Category dragstart/dragend
+        catEl.addEventListener('dragstart', e => {
+          dragState = { type:'category', fromCategoryDragIndex: cIdx };
+          e.dataTransfer.setData('text/plain', JSON.stringify({ type:'category', index:cIdx }));
+          e.dataTransfer.effectAllowed = 'move';
+          catEl.classList.add('dragging');
+        });
+        catEl.addEventListener('dragend', ()=> {
+          dragState = { type: null, fromCat: null, fromIndex: null, fromCategoryDragIndex: null };
+          document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
+          document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
+        });
+
+        // Allow dropping onto category (reorder categories or append item)
+        catEl.addEventListener('dragover', e => {
+          const data = e.dataTransfer.getData('text/plain');
+          if(!data) { e.preventDefault(); return; }
+          try {
+            const parsed = JSON.parse(data);
+            if(parsed.type === 'category' || parsed.type === 'item'){ e.preventDefault(); catEl.classList.add('drag-over'); e.dataTransfer.dropEffect='move'; }
+          } catch(_) {}
+        });
+        catEl.addEventListener('dragleave', ()=> catEl.classList.remove('drag-over'));
+        catEl.addEventListener('drop', e => {
+          e.preventDefault();
+          catEl.classList.remove('drag-over');
+          const data = e.dataTransfer.getData('text/plain');
+          if(!data) return;
+          let parsed;
+          try { parsed = JSON.parse(data); } catch(_) { return; }
+
+          if(parsed.type === 'category'){
+            const from = parsed.index;
+            const to = cIdx;
+            if(from === to) return;
+            const moved = menu.splice(from,1)[0];
+            // compute insert index after removal
+            const insertIndex = from < to ? to : to;
+            menu.splice(insertIndex,0,moved);
+            writeMenuToFirebase();
+            return;
+          }
+
+          if(parsed.type === 'item'){
+            const fromCat = parsed.fromCat;
+            const fromIndex = parsed.fromIndex;
+            if(fromCat == null || fromIndex == null) return;
+            const itemObj = menu[fromCat].items.splice(fromIndex,1)[0];
+            if(!itemObj) return;
+            menu[cIdx].items = menu[cIdx].items || [];
+            menu[cIdx].items.push(itemObj);
+            writeMenuToFirebase();
+            return;
+          }
+        });
+
+        // category content
+        const left = document.createElement('div'); left.className='cat-left';
+        const titleRow = document.createElement('div'); titleRow.style.display='flex'; titleRow.style.justifyContent='space-between'; titleRow.style.alignItems='center';
+        const title = document.createElement('div'); title.innerHTML = '<strong>' + (cat.category || ('Category '+(cIdx+1))) + '</strong>';
+        const actions = document.createElement('div'); actions.className='cat-actions';
+        const editCatBtn = document.createElement('button'); editCatBtn.className='ghost small'; editCatBtn.textContent='Edit';
+        const delCatBtn = document.createElement('button'); delCatBtn.className='btn small'; delCatBtn.textContent='Delete';
+        editCatBtn.onclick = ()=> {
+          const nv = prompt('Edit category name:', cat.category || '');
+          if(nv === null) return;
+          const name = nv.trim();
+          if(!name) return alert('Name cannot be empty');
+          menu[cIdx].category = name;
+          writeMenuToFirebase();
+        };
+        delCatBtn.onclick = ()=> {
+          if(!confirm('Delete category "' + (cat.category||'') + '"?')) return;
+          menu.splice(cIdx,1);
+          writeMenuToFirebase();
+        };
+        actions.appendChild(editCatBtn);
+        actions.appendChild(delCatBtn);
+        titleRow.appendChild(title);
+        titleRow.appendChild(actions);
+        left.appendChild(titleRow);
+
+        // items container (accept drops)
+        const itemsWrap = document.createElement('div'); itemsWrap.style.marginTop='8px'; itemsWrap.dataset.catIndex = cIdx;
+        itemsWrap.addEventListener('dragover', e => {
+          const data = e.dataTransfer.getData('text/plain');
+          if(!data) return;
+          try {
+            const parsed = JSON.parse(data);
+            if(parsed.type === 'item'){ e.preventDefault(); itemsWrap.classList.add('drag-over'); e.dataTransfer.dropEffect = 'move'; }
+          } catch(_) {}
+        });
+        itemsWrap.addEventListener('dragleave', ()=> itemsWrap.classList.remove('drag-over'));
+        itemsWrap.addEventListener('drop', e => {
+          e.preventDefault();
+          itemsWrap.classList.remove('drag-over');
+          const data = e.dataTransfer.getData('text/plain');
+          if(!data) return;
+          try {
+            const parsed = JSON.parse(data);
+            if(parsed.type === 'item'){
+              const fromCat = parsed.fromCat;
+              const fromIndex = parsed.fromIndex;
+              const toCat = parseInt(itemsWrap.dataset.catIndex,10);
+              if(fromCat == null || fromIndex == null || isNaN(toCat)) return;
+              const itemObj = menu[fromCat].items.splice(fromIndex,1)[0];
+              if(!itemObj) return;
+              menu[toCat].items = menu[toCat].items || [];
+              menu[toCat].items.push(itemObj);
+              writeMenuToFirebase();
+            }
+          } catch(_) {}
+        });
+
+        // items (draggable)
+        (cat.items || []).forEach((it, iIdx) => {
+          const itemEl = document.createElement('div'); itemEl.className='item';
+          itemEl.dataset.catIndex = cIdx; itemEl.dataset.itemIndex = iIdx;
+          itemEl.setAttribute('draggable','true');
+
+          itemEl.addEventListener('dragstart', e => {
+            dragState = { type:'item', fromCat:cIdx, fromIndex:iIdx };
+            e.dataTransfer.setData('text/plain', JSON.stringify({ type:'item', fromCat:cIdx, fromIndex:iIdx }));
+            e.dataTransfer.effectAllowed = 'move';
+            itemEl.classList.add('dragging');
+          });
+          itemEl.addEventListener('dragend', () => {
+            dragState = { type:null, fromCat:null, fromIndex:null, fromCategoryDragIndex:null };
+            document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
+            document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
+          });
+
+          // when dragging over an item, allow inserting before/after based on pointer location
+          itemEl.addEventListener('dragover', e => {
+            const data = e.dataTransfer.getData('text/plain');
+            if(!data) return;
+            try {
+              const parsed = JSON.parse(data);
+              if(parsed.type === 'item'){ e.preventDefault(); itemEl.classList.add('drag-over'); e.dataTransfer.dropEffect='move'; }
+            } catch(_) {}
+          });
+          itemEl.addEventListener('dragleave', ()=> itemEl.classList.remove('drag-over'));
+
+          itemEl.addEventListener('drop', e => {
+            e.preventDefault();
+            itemEl.classList.remove('drag-over');
+            const data = e.dataTransfer.getData('text/plain');
+            if(!data) return;
+            try {
+              const parsed = JSON.parse(data);
+              if(parsed.type !== 'item') return;
+              const fromCat = parsed.fromCat;
+              const fromIndex = parsed.fromIndex;
+              const toCat = cIdx;
+              let toIndex = iIdx;
+              const rect = itemEl.getBoundingClientRect();
+              const insertAfter = (e.clientY - rect.top) > (rect.height / 2);
+              if(insertAfter) toIndex = iIdx + 1;
+
+              // moving within same category: adjust indices when removing earlier item
+              if(fromCat === toCat){
+                if(fromIndex < toIndex){
+                  const itemObj = menu[fromCat].items.splice(fromIndex,1)[0];
+                  toIndex = toIndex - 1;
+                  menu[toCat].items.splice(toIndex,0,itemObj);
+                } else {
+                  const itemObj = menu[fromCat].items.splice(fromIndex,1)[0];
+                  menu[toCat].items.splice(toIndex,0,itemObj);
+                }
+              } else {
+                const itemObj = menu[fromCat].items.splice(fromIndex,1)[0];
+                menu[toCat].items = menu[toCat].items || [];
+                menu[toCat].items.splice(toIndex,0,itemObj);
+              }
+              writeMenuToFirebase();
+            } catch(_) {}
+          });
+
+          const itemLeft = document.createElement('div'); itemLeft.textContent = it.name + ' ';
+          const priceSpan = document.createElement('span'); priceSpan.className='muted'; priceSpan.textContent = '€' + (Number(it.price)||0).toFixed(2);
+          itemLeft.appendChild(priceSpan);
+
+          const itemActions = document.createElement('div');
+          const editItBtn = document.createElement('button'); editItBtn.className='ghost small'; editItBtn.textContent='Edit';
+          const delItBtn = document.createElement('button'); delItBtn.className='btn small'; delItBtn.textContent='Delete';
+
+          editItBtn.onclick = ()=> {
+            const newName = prompt('Item name:', it.name);
+            if(newName === null) return;
+            const nn = newName.trim();
+            if(!nn) return alert('Name cannot be empty');
+            const newPrice = prompt('Item price (number):', String(it.price || '0'));
+            if(newPrice === null) return;
+            const np = parseFloat(newPrice);
+            if(isNaN(np)) return alert('Price must be a number');
+            menu[cIdx].items[iIdx].name = nn;
+            menu[cIdx].items[iIdx].price = np;
+            writeMenuToFirebase();
+          };
+
+          delItBtn.onclick = ()=> {
+            if(!confirm('Delete item "' + it.name + '"?')) return;
+            menu[cIdx].items.splice(iIdx,1);
+            writeMenuToFirebase();
+          };
+
+          itemActions.appendChild(editItBtn);
+          itemActions.appendChild(delItBtn);
+
+          itemEl.appendChild(itemLeft);
+          itemEl.appendChild(itemActions);
+          itemsWrap.appendChild(itemEl);
+        });
+
+        // add item inputs
+        const addRow = document.createElement('div'); addRow.style.display='flex'; addRow.style.gap='8px'; addRow.style.marginTop='8px';
+        const itName = document.createElement('input'); itName.type='text'; itName.placeholder='Item name';
+        const itPrice = document.createElement('input'); itPrice.type='number'; itPrice.step='0.01'; itPrice.placeholder='Price';
+        const addItBtn = document.createElement('button'); addItBtn.className='btn small'; addItBtn.textContent='Add Item';
+        addItBtn.onclick = ()=> {
+          const name = itName.value.trim();
+          const price = parseFloat(itPrice.value);
+          if(!name) return alert('Item name required');
+          if(isNaN(price)) return alert('Price must be a number');
+          menu[cIdx].items = menu[cIdx].items || [];
+          menu[cIdx].items.push({ name: name, price: price });
+          itName.value=''; itPrice.value='';
+          writeMenuToFirebase();
+        };
+        addRow.appendChild(itName); addRow.appendChild(itPrice); addRow.appendChild(addItBtn);
+
+        left.appendChild(itemsWrap);
+        left.appendChild(addRow);
+
+        catEl.appendChild(left);
+        categoriesList.appendChild(catEl);
+      });
+
+      if(menu.length === 0){
+        categoriesList.innerHTML = '<div class="muted">No categories. Add a category to get started.</div>';
+      }
+    }
+
+    addCategoryBtn.addEventListener('click', ()=> {
+      const name = newCategoryInput.value.trim();
+      if(!name) return alert('Category name required');
+      menu.push({ category: name, items: [] });
+      newCategoryInput.value = '';
+      writeMenuToFirebase();
+    });
+
+    refreshBtn.addEventListener('click', ()=> {
+      menuRef.once('value').then(snap => {
+        const val = snap.val();
+        if(!val) menu = defaultMenu.slice();
+        else menu = Array.isArray(val) ? val : (val.menu || Object.values(val));
+        renderCategories();
+      });
+    });
+
+    exportBtn.addEventListener('click', ()=> {
+      const data = JSON.stringify(menu, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'menu.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    importBtn.addEventListener('click', ()=> importArea.click());
+    importArea.addEventListener('change', (e)=> {
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        try {
+          const data = JSON.parse(ev.target.result);
+          if(!Array.isArray(data)) {
+            if(Array.isArray(data.menu)) menu = data.menu;
+            else return alert('Imported JSON must be an array of categories');
+          } else {
+            menu = data;
+          }
+          writeMenuToFirebase();
+        } catch(err) {
+          alert('Invalid JSON file: ' + (err.message||err));
+        }
+      };
+      reader.readAsText(file);
+      importArea.value = '';
+    });
+
+    // seed default if empty
+    menuRef.once('value').then(snap => {
+      if(!snap.exists()){
+        menuRef.set(defaultMenu).catch(err => console.warn('Could not seed default menu:', err));
+      }
+    }).catch(err => console.warn('Error checking menu path:', err));
+
+    // initial fallback render
+    renderCategories();
+  </script>
+</body>
+</html>
